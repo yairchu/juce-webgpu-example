@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(MyWebGPUCompute C CXX)
+project(JuceWebGPUExample C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -13,6 +13,13 @@ file(
 )
 include(${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake)
 
+# Pull JUCE using CPM
+CPMAddPackage(
+  NAME JUCE
+  GITHUB_REPOSITORY juce-framework/JUCE
+  GIT_TAG 8.0.3
+)
+
 # Pull WebGPU-distribution using CPM
 CPMAddPackage(
   NAME webgpu_dist
@@ -23,16 +30,57 @@ CPMAddPackage(
 # Force backend to wgpu-native (WGPU)
 set(WEBGPU_BACKEND WGPU CACHE STRING "WebGPU backend")
 
-add_executable(my_compute src/main.cpp)
+# Create JUCE GUI application
+juce_add_gui_app(JuceWebGPUExample
+    PRODUCT_NAME "JUCE WebGPU Example"
+    COMPANY_NAME "Your Company"
+    VERSION "1.0.0"
+    BUNDLE_ID "com.yourcompany.jucewebgpuexample"
+)
 
-# Link the 'webgpu' target provided by WebGPU-distribution
-target_link_libraries(my_compute PRIVATE webgpu)
+# Generate config header
+juce_generate_juce_header(JuceWebGPUExample)
 
+# Add source files
+target_sources(JuceWebGPUExample
+    PRIVATE
+        src/main.cpp
+        src/MainComponent.h
+        src/MainComponent.cpp
+        src/WebGPUCompute.h
+        src/WebGPUCompute.cpp
+)
+
+# Link JUCE modules
+target_link_libraries(JuceWebGPUExample
+    PRIVATE
+        juce::juce_gui_extra
+        juce::juce_gui_basics
+        juce::juce_core
+        juce::juce_events
+        juce::juce_graphics
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags
+)
+
+# Link WebGPU
+target_link_libraries(JuceWebGPUExample PRIVATE webgpu)
+
+# Compiler-specific options
 if (MSVC)
-  target_compile_options(my_compute PRIVATE /Zc:__cplusplus)
+    target_compile_options(JuceWebGPUExample PRIVATE /Zc:__cplusplus)
 endif()
 
-add_custom_command(TARGET my_compute POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy_directory
-          ${CMAKE_SOURCE_DIR}/shaders
-          $<TARGET_FILE_DIR:my_compute>/shaders)
+# Copy shaders to build directory
+add_custom_command(TARGET JuceWebGPUExample POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_SOURCE_DIR}/shaders
+            $<TARGET_FILE_DIR:JuceWebGPUExample>/shaders)
+
+# Set binary data directory for JUCE
+juce_add_binary_data(SharedBinaryData
+    SOURCES
+        shaders/comp.wgsl
+)

@@ -1,150 +1,97 @@
-#define WEBGPU_CPP_IMPLEMENTATION
+#include <juce_gui_extra/juce_gui_extra.h>
+#include "MainComponent.h"
 
-#include <webgpu/webgpu-raii.hpp>
+//==============================================================================
+class JuceWebGPUExampleApplication : public juce::JUCEApplication
+{
+public:
+    //==============================================================================
+    JuceWebGPUExampleApplication() {}
 
-#include <atomic>
-#include <cassert>
-#include <chrono>
-#include <cstdint>
-#include <cstdio>
-#include <cstring>
-#include <fstream>
-#include <sstream>
-#include <string>
-#include <thread>
+    const juce::String getApplicationName() override       { return "JUCE WebGPU Example"; }
+    const juce::String getApplicationVersion() override    { return "1.0.0"; }
+    bool moreThanOneInstanceAllowed() override             { return true; }
 
-static std::string load_text_file(const char* path) {
-    std::ifstream f(path);
-    std::stringstream ss;
-    ss << f.rdbuf();
-    return ss.str();
-}
-
-int main() {
-    wgpu::raii::Instance instance = wgpu::createInstance();
-    assert(instance);
-
-    wgpu::raii::Device device = wgpu::raii::Adapter (instance->requestAdapter ({}))->requestDevice ({});
-    assert(device);
-
-    wgpu::raii::Queue queue = device->getQueue();
-
-    std::string wgsl = load_text_file("shaders/comp.wgsl");
-    assert(!wgsl.empty());
-
-    const WGPUShaderSourceWGSL wgslSource {
-        .chain = {.sType = WGPUSType_ShaderSourceWGSL},
-        .code = wgpu::StringView (wgsl),
-    };
-    const WGPUShaderModuleDescriptor shaderDesc {
-        .nextInChain = &wgslSource.chain,
-        .label = wgpu::StringView ("comp.wgsl"),
-    };
-    // For a mysterious reason this fails when using device->createShaderModule(shaderDesc)
-    wgpu::raii::ShaderModule shaderModule (wgpuDeviceCreateShaderModule (*device, &shaderDesc));
-    assert(shaderModule);
-
-    const uint64_t bufferSize = sizeof(uint32_t);
-    
-    // Storage buffer for compute shader
-    wgpu::raii::Buffer storage = device->createBuffer (
-        WGPUBufferDescriptor {
-            .usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc,
-            .size = bufferSize,
-            .mappedAtCreation = false,
-        });
-    assert(storage);
-    
-    // Staging buffer for reading results
-    wgpu::raii::Buffer staging = device->createBuffer (
-        WGPUBufferDescriptor {
-            .usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead,
-            .size = bufferSize,
-            .mappedAtCreation = false,
-        });
-    assert(staging);
-
-    const WGPUBindGroupLayoutEntry bglEntry {
-        .binding = 0,
-        .visibility = WGPUShaderStage_Compute,
-        .buffer =
-            {
-                .type = WGPUBufferBindingType_Storage,
-                .hasDynamicOffset = false,
-                .minBindingSize = bufferSize,
-            },
-    };
-    wgpu::raii::BindGroupLayout bgl =
-        device->createBindGroupLayout (WGPUBindGroupLayoutDescriptor {.entryCount = 1, .entries = &bglEntry});
-
-    wgpu::raii::PipelineLayout pipelineLayout = device->createPipelineLayout (
-        WGPUPipelineLayoutDescriptor {
-            .bindGroupLayoutCount = 1,
-            .bindGroupLayouts = &(WGPUBindGroupLayout&) *bgl,
-        });
-    wgpu::raii::ComputePipeline pipeline = device->createComputePipeline (
-        WGPUComputePipelineDescriptor {
-            .layout = *pipelineLayout,
-            .compute = {
-                .module = *shaderModule,
-                .entryPoint = wgpu::StringView ("main"),
-            }});
-    assert(pipeline);
-
+    //==============================================================================
+    void initialise(const juce::String& commandLine) override
     {
-        const WGPUBindGroupEntry bgEntry {
-            .binding = 0,
-            .buffer = *storage,
-            .offset = 0,
-            .size = bufferSize,
-        };
-        wgpu::raii::BindGroup bindGroup = device->createBindGroup (
-            WGPUBindGroupDescriptor {
-                .layout = *bgl,
-                .entryCount = 1,
-                .entries = &bgEntry,
-            });
-
-        wgpu::raii::CommandEncoder encoder = device->createCommandEncoder();
-        wgpu::raii::ComputePassEncoder pass = encoder->beginComputePass();
-        pass->setPipeline (*pipeline);
-        pass->setBindGroup (0, *bindGroup, 0, nullptr);
-        pass->dispatchWorkgroups (1, 1, 1);
-        pass->end();
-        queue->submit (1, &*wgpu::raii::CommandBuffer (encoder->finish()));
+        // This method is where you should put your application's initialisation code..
+        
+        mainWindow.reset(new MainWindow(getApplicationName()));
     }
 
-    // Copy from storage buffer to staging buffer
+    void shutdown() override
     {
-        wgpu::raii::CommandEncoder encoder = device->createCommandEncoder();
-        encoder->copyBufferToBuffer (*storage, 0, *staging, 0, bufferSize);
-        queue->submit (1, &*wgpu::raii::CommandBuffer (encoder->finish()));
+        // Add your application's shutdown code here..
+
+        mainWindow = nullptr; // (deletes our window)
     }
 
-    std::atomic<bool> mapped {false};
-    staging->mapAsync (
-        WGPUMapMode_Read,
-        0,
-        bufferSize,
-        WGPUBufferMapCallbackInfo {
-            .callback =
-                [] (WGPUMapAsyncStatus status, WGPUStringView message, void* userdata1, void* userdata2) {
-                    auto* flag = reinterpret_cast<std::atomic<bool>*> (userdata1);
-                    flag->store (true, std::memory_order_release);
-                },
-            .userdata1 = &mapped,
-        });
-
-    while (! mapped.load (std::memory_order_acquire)) {
-        instance->processEvents();
-        std::this_thread::sleep_for (std::chrono::milliseconds (1));
+    //==============================================================================
+    void systemRequestedQuit() override
+    {
+        // This is called when the app is being asked to quit: you can ignore this
+        // request and let the app carry on running, or call quit() to allow the app to close.
+        quit();
     }
 
-    const void* ptr = staging->getConstMappedRange (0, bufferSize);
-    uint32_t value = 0;
-    std::memcpy(&value, ptr, sizeof(uint32_t));
-    std::printf("Compute result: %u\n", value);
-    staging->unmap();
+    void anotherInstanceStarted(const juce::String& commandLine) override
+    {
+        // When another instance of the app is launched while this one is running,
+        // this method is invoked, and the commandLine parameter tells you what
+        // the other instance's command-line arguments were.
+    }
 
-    return 0;
-}
+    //==============================================================================
+    /*
+        This class implements the desktop window that contains an instance of
+        our MainComponent class.
+    */
+    class MainWindow    : public juce::DocumentWindow
+    {
+    public:
+        MainWindow(juce::String name)
+            : DocumentWindow(name,
+                            juce::Desktop::getInstance().getDefaultLookAndFeel()
+                                                        .findColour(juce::ResizableWindow::backgroundColourId),
+                            DocumentWindow::allButtons)
+        {
+            setUsingNativeTitleBar(true);
+            setContentOwned(new MainComponent(), true);
+
+           #if JUCE_IOS || JUCE_ANDROID
+            setFullScreen(true);
+           #else
+            setResizable(true, true);
+            centreWithSize(getWidth(), getHeight());
+           #endif
+
+            setVisible(true);
+        }
+
+        void closeButtonPressed() override
+        {
+            // This is called when the user tries to close this window. Here, we'll just
+            // ask the app to quit when this happens, but you can change this to do
+            // whatever you need.
+            JUCEApplication::getInstance()->systemRequestedQuit();
+        }
+
+        /* Note: Be careful if you override any DocumentWindow methods - the base
+           class uses a lot of them, so by overriding you might break its functionality.
+           It's best to do all your work in your content component instead, but if
+           you really have to override any DocumentWindow methods, make sure your
+           subclass also calls the superclass's method.
+        */
+
+    private:
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainWindow)
+    };
+
+private:
+    std::unique_ptr<MainWindow> mainWindow;
+};
+
+//==============================================================================
+// This macro generates the main() routine that launches the app.
+START_JUCE_APPLICATION(JuceWebGPUExampleApplication)
