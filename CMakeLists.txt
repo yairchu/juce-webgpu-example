@@ -83,12 +83,3 @@ target_link_libraries(JuceWebGPUExample PRIVATE webgpu)
 if (MSVC)
     target_compile_options(JuceWebGPUExample PRIVATE /Zc:__cplusplus)
 endif()
-
-# Set binary data directory for JUCE
-juce_add_binary_data(SharedBinaryData
-    SOURCES
-        shaders/comp.wgsl
-)
-
-# Link binary data to the target
-target_link_libraries(JuceWebGPUExample PRIVATE SharedBinaryData)

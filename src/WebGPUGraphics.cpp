@@ -7,6 +7,33 @@
 WebGPUGraphics::WebGPUGraphics() = default;
 WebGPUGraphics::~WebGPUGraphics() = default;
 
+namespace
+{
+
+const char* vertexShaderSource = R"(
+    struct VertexOutput {
+        @builtin(position) position: vec4<f32>,
+        @location(0) color: vec3<f32>,
+    }
+
+    @vertex
+    fn vs_main(@location(0) position: vec2<f32>, @location(1) color: vec3<f32>) -> VertexOutput {
+        var output: VertexOutput;
+        output.position = vec4<f32>(position, 0.0, 1.0);
+        output.color = color;
+        return output;
+    }
+)";
+
+const char* fragmentShaderSource = R"(
+    @fragment
+    fn fs_main(@location(0) color: vec3<f32>) -> @location(0) vec4<f32> {
+        return vec4<f32>(color, 1.0);
+    }
+)";
+
+} // namespace
+
 bool WebGPUGraphics::initialize (int width, int height)
 {
     if (initialized)
@@ -15,99 +42,49 @@ bool WebGPUGraphics::initialize (int width, int height)
     textureWidth = width;
     textureHeight = height;
 
-    try
-    {
-        // Create WebGPU instance
-        instance = wgpu::createInstance();
-        if (! instance)
-        {
-            juce::Logger::writeToLog ("Failed to create WebGPU instance");
-            return false;
-        }
-
-        // Get adapter and device
-        auto adapter = wgpu::raii::Adapter (instance->requestAdapter ({}));
-        if (! adapter)
-        {
-            juce::Logger::writeToLog ("Failed to get WebGPU adapter");
-            return false;
-        }
-
-        device = adapter->requestDevice ({});
-        if (! device)
-        {
-            juce::Logger::writeToLog ("Failed to get WebGPU device");
-            return false;
-        }
-
-        queue = device->getQueue();
-
-        // Create shaders
-        const char* vertexShaderSource = R"(
-            struct VertexOutput {
-                @builtin(position) position: vec4<f32>,
-                @location(0) color: vec3<f32>,
-            }
-
-            @vertex
-            fn vs_main(@location(0) position: vec2<f32>, @location(1) color: vec3<f32>) -> VertexOutput {
-                var output: VertexOutput;
-                output.position = vec4<f32>(position, 0.0, 1.0);
-                output.color = color;
-                return output;
-            }
-        )";
-
-        const char* fragmentShaderSource = R"(
-            @fragment
-            fn fs_main(@location(0) color: vec3<f32>) -> @location(0) vec4<f32> {
-                return vec4<f32>(color, 1.0);
-            }
-        )";
-
-        // Create vertex shader
-        const WGPUShaderSourceWGSL vertexWgslSource {
-            .chain = { .sType = WGPUSType_ShaderSourceWGSL },
-            .code = wgpu::StringView (vertexShaderSource),
-        };
-        const WGPUShaderModuleDescriptor vertexShaderDesc {
-            .nextInChain = &vertexWgslSource.chain,
-            .label = wgpu::StringView ("vertex_shader"),
-        };
-        vertexShader = wgpu::raii::ShaderModule (wgpuDeviceCreateShaderModule (*device, &vertexShaderDesc));
-
-        // Create fragment shader
-        const WGPUShaderSourceWGSL fragmentWgslSource {
-            .chain = { .sType = WGPUSType_ShaderSourceWGSL },
-            .code = wgpu::StringView (fragmentShaderSource),
-        };
-        const WGPUShaderModuleDescriptor fragmentShaderDesc {
-            .nextInChain = &fragmentWgslSource.chain,
-            .label = wgpu::StringView ("fragment_shader"),
-        };
-        fragmentShader = wgpu::raii::ShaderModule (wgpuDeviceCreateShaderModule (*device, &fragmentShaderDesc));
-
-        if (! vertexShader || ! fragmentShader)
-        {
-            juce::Logger::writeToLog ("Failed to create shaders");
-            return false;
-        }
-
-        // Create texture and vertex buffer
-        if (! createTexture (width, height) || ! createVertexBuffer() || ! createPipeline())
-        {
-            return false;
-        }
-
-        initialized = true;
-        juce::Logger::writeToLog ("WebGPU graphics initialized successfully");
-        return true;
-    }
-    catch (const std::exception& e)
-    {
-        juce::Logger::writeToLog ("Exception during WebGPU graphics initialization: " + juce::String (e.what()));
+    instance = wgpu::createInstance();
+    if (! instance)
         return false;
-    }
+
+    auto adapter = wgpu::raii::Adapter (instance->requestAdapter ({}));
+    if (! adapter)
+        return false;
+
+    device = adapter->requestDevice ({});
+    if (! device)
+        return false;
+
+    queue = device->getQueue();
+
+    const WGPUShaderSourceWGSL vertexWgslSource {
+        .chain = { .sType = WGPUSType_ShaderSourceWGSL },
+        .code = wgpu::StringView (vertexShaderSource),
+    };
+    const WGPUShaderModuleDescriptor vertexShaderDesc {
+        .nextInChain = &vertexWgslSource.chain,
+        .label = wgpu::StringView ("vertex_shader"),
+    };
+    vertexShader = wgpu::raii::ShaderModule (wgpuDeviceCreateShaderModule (*device, &vertexShaderDesc));
+
+    const WGPUShaderSourceWGSL fragmentWgslSource {
+        .chain = { .sType = WGPUSType_ShaderSourceWGSL },
+        .code = wgpu::StringView (fragmentShaderSource),
+    };
+    const WGPUShaderModuleDescriptor fragmentShaderDesc {
+        .nextInChain = &fragmentWgslSource.chain,
+        .label = wgpu::StringView ("fragment_shader"),
+    };
+    fragmentShader = wgpu::raii::ShaderModule (wgpuDeviceCreateShaderModule (*device, &fragmentShaderDesc));
+
+    if (! vertexShader || ! fragmentShader)
+        return false;
+
+    if (! createTexture (width, height) || ! createVertexBuffer() || ! createPipeline())
+        return false;
+
+    initialized = true;
+    juce::Logger::writeToLog ("WebGPU graphics initialized successfully");
+    return true;
 }
 
 bool WebGPUGraphics::createTexture (int width, int height)
@@ -234,126 +211,111 @@ juce::Image WebGPUGraphics::renderFrame()
     if (! initialized)
         return {};
 
-    try
+    // Render to texture
     {
-        // Render to texture
-        {
-            wgpu::raii::CommandEncoder encoder = device->createCommandEncoder();
+        wgpu::raii::CommandEncoder encoder = device->createCommandEncoder();
 
-            WGPURenderPassColorAttachment colorAttachment = {
-                .view = *renderTextureView,
-                .resolveTarget = nullptr,
-                .loadOp = WGPULoadOp_Clear,
-                .storeOp = WGPUStoreOp_Store,
-                .clearValue = { 0.1f, 0.1f, 0.1f, 1.0f }, // Dark gray background
-            };
+        WGPURenderPassColorAttachment colorAttachment = {
+            .view = *renderTextureView,
+            .resolveTarget = nullptr,
+            .loadOp = WGPULoadOp_Clear,
+            .storeOp = WGPUStoreOp_Store,
+            .clearValue = { 0.1f, 0.1f, 0.1f, 1.0f }, // Dark gray background
+        };
 
-            WGPURenderPassDescriptor renderPassDesc = {
-                .colorAttachmentCount = 1,
-                .colorAttachments = &colorAttachment,
-                .depthStencilAttachment = nullptr,
-            };
+        WGPURenderPassDescriptor renderPassDesc = {
+            .colorAttachmentCount = 1,
+            .colorAttachments = &colorAttachment,
+            .depthStencilAttachment = nullptr,
+        };
 
-            wgpu::raii::RenderPassEncoder pass = encoder->beginRenderPass (renderPassDesc);
-            pass->setPipeline (*renderPipeline);
-            pass->setVertexBuffer (0, *vertexBuffer, 0, WGPU_WHOLE_SIZE);
-            pass->draw (3, 1, 0, 0); // Draw 3 vertices
-            pass->end();
+        wgpu::raii::RenderPassEncoder pass = encoder->beginRenderPass (renderPassDesc);
+        pass->setPipeline (*renderPipeline);
+        pass->setVertexBuffer (0, *vertexBuffer, 0, WGPU_WHOLE_SIZE);
+        pass->draw (3, 1, 0, 0); // Draw 3 vertices
+        pass->end();
 
-            queue->submit (1, &*wgpu::raii::CommandBuffer (encoder->finish()));
-        }
-
-        // Read back the texture data directly from render texture
-        // WebGPU requires bytes per row to be aligned to 256 bytes
-        const uint32_t unalignedBytesPerRow = (uint32_t) textureWidth * bytesPerPixel;
-        const uint32_t alignment = 256;
-        const uint32_t bytesPerRow = ((unalignedBytesPerRow + alignment - 1) / alignment) * alignment;
-        const uint32_t bufferSize = bytesPerRow * (uint32_t) textureHeight;
-
-        wgpu::raii::Buffer readbackBuffer = device->createBuffer (WGPUBufferDescriptor {
-            .usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead,
-            .size = bufferSize,
-            .mappedAtCreation = false,
-        });
-
-        // Copy render texture directly to buffer (no intermediate texture needed)
-        {
-            wgpu::raii::CommandEncoder encoder = device->createCommandEncoder();
-            encoder->copyTextureToBuffer (
-                WGPUTexelCopyTextureInfo {
-                    .texture = *renderTexture, // Copy directly from render texture
-                    .mipLevel = 0,
-                    .origin = { 0, 0, 0 },
-                    .aspect = WGPUTextureAspect_All,
-                },
-                WGPUTexelCopyBufferInfo {
-                    .buffer = *readbackBuffer,
-                    .layout = {
-                        .offset = 0,
-                        .bytesPerRow = bytesPerRow,
-                        .rowsPerImage = static_cast<uint32_t> (textureHeight),
-                    },
-                },
-                WGPUExtent3D {
-                    .width = static_cast<uint32_t> (textureWidth),
-                    .height = static_cast<uint32_t> (textureHeight),
-                    .depthOrArrayLayers = 1,
-                });
-            queue->submit (1, &*wgpu::raii::CommandBuffer (encoder->finish()));
-        }
-
-        // Map and read the buffer
-        std::atomic<bool> mapped { false };
-        readbackBuffer->mapAsync (
-            WGPUMapMode_Read, 0, bufferSize, WGPUBufferMapCallbackInfo {
-                                                 .callback = [] (WGPUMapAsyncStatus, WGPUStringView, void* userdata1, void*)
-                                                 {
-                                                     auto* flag = reinterpret_cast<std::atomic<bool>*> (userdata1);
-                                                     flag->store (true, std::memory_order_release);
-                                                 },
-                                                 .userdata1 = &mapped,
-                                             });
-
-        // Wait for mapping to complete
-        while (! mapped.load (std::memory_order_acquire))
-        {
-            instance->processEvents();
-            std::this_thread::sleep_for (std::chrono::milliseconds (1));
-        }
-
-        const void* ptr = readbackBuffer->getConstMappedRange (0, bufferSize);
-
-        // Create JUCE image from the data
-        juce::Image image (juce::Image::ARGB, textureWidth, textureHeight, true);
-        juce::Image::BitmapData bitmap (image, juce::Image::BitmapData::writeOnly);
-
-        // Copy pixel data (WebGPU uses RGBA, JUCE uses ARGB)
-        // Account for potential row padding due to alignment
-        const uint8_t* src = static_cast<const uint8_t*> (ptr);
-        for (int y = 0; y < textureHeight; ++y)
-        {
-            for (int x = 0; x < textureWidth; ++x)
-            {
-                // Use aligned bytes per row for source indexing
-                const int srcIndex = (y * (int) bytesPerRow) + (x * 4);
-                const uint8_t r = src[srcIndex + 0];
-                const uint8_t g = src[srcIndex + 1];
-                const uint8_t b = src[srcIndex + 2];
-                const uint8_t a = src[srcIndex + 3];
-
-                bitmap.setPixelColour (x, y, juce::Colour::fromRGBA (r, g, b, a));
-            }
-        }
-
-        readbackBuffer->unmap();
-
-        return image;
+        queue->submit (1, &*wgpu::raii::CommandBuffer (encoder->finish()));
     }
-    catch (const std::exception& e)
+
+    // Read back the texture data directly from render texture
+    // WebGPU requires bytes per row to be aligned to 256 bytes
+    const uint32_t unalignedBytesPerRow = (uint32_t) textureWidth * bytesPerPixel;
+    const uint32_t alignment = 256;
+    const uint32_t bytesPerRow = ((unalignedBytesPerRow + alignment - 1) / alignment) * alignment;
+    const uint32_t bufferSize = bytesPerRow * (uint32_t) textureHeight;
+
+    wgpu::raii::Buffer readbackBuffer = device->createBuffer (WGPUBufferDescriptor {
+        .usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead,
+        .size = bufferSize,
+        .mappedAtCreation = false,
+    });
+
+    // Copy render texture directly to buffer (no intermediate texture needed)
     {
-        juce::Logger::writeToLog ("Exception during frame rendering: " + juce::String (e.what()));
-        return {};
+        wgpu::raii::CommandEncoder encoder = device->createCommandEncoder();
+        encoder->copyTextureToBuffer (
+            WGPUTexelCopyTextureInfo {
+                .texture = *renderTexture, // Copy directly from render texture
+                .mipLevel = 0,
+                .origin = { 0, 0, 0 },
+                .aspect = WGPUTextureAspect_All,
+            },
+            WGPUTexelCopyBufferInfo {
+                .buffer = *readbackBuffer,
+                .layout = {
+                    .offset = 0,
+                    .bytesPerRow = bytesPerRow,
+                    .rowsPerImage = static_cast<uint32_t> (textureHeight),
+                },
+            },
+            WGPUExtent3D {
+                .width = static_cast<uint32_t> (textureWidth),
+                .height = static_cast<uint32_t> (textureHeight),
+                .depthOrArrayLayers = 1,
+            });
+        queue->submit (1, &*wgpu::raii::CommandBuffer (encoder->finish()));
     }
+
+    // Map and read the buffer
+    std::atomic<bool> mapped { false };
+    readbackBuffer->mapAsync (
+        WGPUMapMode_Read, 0, bufferSize, WGPUBufferMapCallbackInfo {
+                                             .callback = [] (WGPUMapAsyncStatus, WGPUStringView, void* userdata1, void*)
+                                             {
+                                                 auto* flag = reinterpret_cast<std::atomic<bool>*> (userdata1);
+                                                 flag->store (true, std::memory_order_release);
+                                             },
+                                             .userdata1 = &mapped,
+                                         });
+
+    // Wait for mapping to complete
+    while (! mapped.load (std::memory_order_acquire))
+    {
+        instance->processEvents();
+        std::this_thread::sleep_for (std::chrono::milliseconds (1));
+    }
+
+    const void* ptr = readbackBuffer->getConstMappedRange (0, bufferSize);
+
+    // Create JUCE image from the data
+    juce::Image image (juce::Image::ARGB, textureWidth, textureHeight, true);
+    juce::Image::BitmapData bitmap (image, juce::Image::BitmapData::writeOnly);
+
+    // Copy pixel data (WebGPU uses RGBA, JUCE uses ARGB)
+    // Account for potential row padding due to alignment
+    const uint8_t* src = static_cast<const uint8_t*> (ptr);
+    for (int y = 0; y < textureHeight; ++y)
+        for (int x = 0; x < textureWidth; ++x)
+        {
+            // Use aligned bytes per row for source indexing
+            const int srcIndex = (y * (int) bytesPerRow) + (x * 4);
+            bitmap.setPixelColour (x, y, juce::Colour::fromRGBA (src[srcIndex + 0], src[srcIndex + 1], src[srcIndex + 2], src[srcIndex + 3]));
+        }
+
+    readbackBuffer->unmap();
+
+    return image;
 }
 
 void WebGPUGraphics::shutdown()
