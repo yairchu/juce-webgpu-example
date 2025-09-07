@@ -6,19 +6,11 @@
 #include <chrono>
 #include <thread>
 
+#include "BinaryData.h"
 #include <juce_events/juce_events.h>
 
 WebGPUCompute::WebGPUCompute() = default;
 WebGPUCompute::~WebGPUCompute() = default;
-
-juce::String WebGPUCompute::loadTextFile(const juce::String& path)
-{
-    juce::File file(path);
-    if (!file.existsAsFile())
-        return {};
-    
-    return file.loadFileAsString();
-}
 
 bool WebGPUCompute::initialize()
 {
@@ -52,17 +44,13 @@ bool WebGPUCompute::initialize()
 
         queue = device->getQueue();
 
-        // Load and create shader module
-        auto shaderPath = juce::File::getCurrentWorkingDirectory()
-                             .getChildFile("shaders")
-                             .getChildFile("comp.wgsl")
-                             .getFullPathName();
-        
-        juce::String wgsl = loadTextFile(shaderPath);
+        // Load shader from binary data
+        juce::String wgsl = juce::String::createStringFromData(
+            BinaryData::comp_wgsl, BinaryData::comp_wgslSize);
         if (wgsl.isEmpty())
         {
-            juce::Logger::writeToLog("Failed to load shader file: " + shaderPath);
-            return false;
+          juce::Logger::writeToLog("Failed to load shader from binary data");
+          return false;
         }
 
         const WGPUShaderSourceWGSL wgslSource{

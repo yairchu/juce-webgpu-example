@@ -23,9 +23,7 @@ public:
     
     bool isInitialized() const { return initialized; }
 
-private:
-    static juce::String loadTextFile(const juce::String& path);
-    
+  private:
     bool initialized = false;
     
     wgpu::raii::Instance instance;
