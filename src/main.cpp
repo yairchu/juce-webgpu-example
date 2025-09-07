@@ -21,17 +21,8 @@ static std::string load_text_file(const char* path) {
     return ss.str();
 }
 
-static void wait_until(std::atomic<bool>& flag, WGPUInstance instance = nullptr) {
-    while (!flag.load(std::memory_order_acquire)) {
-        if (instance) {
-            wgpuInstanceProcessEvents(instance);
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    }
-}
-
 int main() {
-    wgpu::Instance instance = wgpu::createInstance({});
+    wgpu::Instance instance = wgpu::createInstance();
     assert(instance);
 
     wgpu::Adapter adapter = instance.requestAdapter({});
@@ -49,13 +40,14 @@ int main() {
 
     const WGPUShaderSourceWGSL wgslSource {
         .chain = {.sType = WGPUSType_ShaderSourceWGSL},
-        .code = WGPUStringView {.data = wgsl.c_str(), .length = wgsl.length()},
+        .code = wgpu::StringView (wgsl),
     };
     const WGPUShaderModuleDescriptor shaderDesc {
         .nextInChain = &wgslSource.chain,
-        .label = WGPUStringView {.data = "comp.wgsl", .length = 9},
+        .label = wgpu::StringView ("comp.wgsl"),
     };
-    WGPUShaderModule shaderModule = wgpuDeviceCreateShaderModule(device, &shaderDesc);
+    // For a mysterious reason this fails when using device.createShaderModule(shaderDesc)
+    wgpu::ShaderModule shaderModule = wgpuDeviceCreateShaderModule (device, &shaderDesc);
     assert(shaderModule);
 
     const uint64_t bufferSize = sizeof(uint32_t);
@@ -88,22 +80,21 @@ int main() {
                 .minBindingSize = bufferSize,
             },
     };
-    const WGPUBindGroupLayoutDescriptor bglDesc {.entryCount = 1, .entries = &bglEntry};
-    WGPUBindGroupLayout bgl = wgpuDeviceCreateBindGroupLayout(device, &bglDesc);
+    wgpu::BindGroupLayout bgl =
+        device.createBindGroupLayout (WGPUBindGroupLayoutDescriptor {.entryCount = 1, .entries = &bglEntry});
 
-    const WGPUPipelineLayoutDescriptor plDesc {
-        .bindGroupLayoutCount = 1,
-        .bindGroupLayouts = &bgl,
-    };
-    WGPUPipelineLayout pipelineLayout = wgpuDeviceCreatePipelineLayout(device, &plDesc);
-
-    const WGPUComputePipelineDescriptor cpDesc {
-        .layout = pipelineLayout,
-        .compute = {
-            .module = shaderModule,
-            .entryPoint = WGPUStringView {.data = "main", .length = 4},
-        }};
-    WGPUComputePipeline pipeline = wgpuDeviceCreateComputePipeline(device, &cpDesc);
+    wgpu::PipelineLayout pipelineLayout = device.createPipelineLayout (
+        WGPUPipelineLayoutDescriptor {
+            .bindGroupLayoutCount = 1,
+            .bindGroupLayouts = &(WGPUBindGroupLayout&) bgl,
+        });
+    wgpu::ComputePipeline pipeline = device.createComputePipeline (
+        WGPUComputePipelineDescriptor {
+            .layout = pipelineLayout,
+            .compute = {
+                .module = shaderModule,
+                .entryPoint = wgpu::StringView ("main"),
+            }});
     assert(pipeline);
 
     const WGPUBindGroupEntry bgEntry {
@@ -112,41 +103,36 @@ int main() {
         .offset = 0,
         .size = bufferSize,
     };
-    const WGPUBindGroupDescriptor bgDesc {
-        .layout = bgl,
-        .entryCount = 1,
-        .entries = &bgEntry,
-    };
-    WGPUBindGroup bindGroup = wgpuDeviceCreateBindGroup(device, &bgDesc);
+    wgpu::BindGroup bindGroup = device.createBindGroup (
+        WGPUBindGroupDescriptor {
+            .layout = bgl,
+            .entryCount = 1,
+            .entries = &bgEntry,
+        });
 
-    const WGPUCommandEncoderDescriptor encDesc {};
-    WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(device, &encDesc);
-    const WGPUComputePassDescriptor passDesc {};
-    WGPUComputePassEncoder pass = wgpuCommandEncoderBeginComputePass(encoder, &passDesc);
-    wgpuComputePassEncoderSetPipeline(pass, pipeline);
-    wgpuComputePassEncoderSetBindGroup(pass, 0, bindGroup, 0, nullptr);
-    wgpuComputePassEncoderDispatchWorkgroups(pass, 1, 1, 1);
-    wgpuComputePassEncoderEnd(pass);
-    WGPUCommandBufferDescriptor cbDesc = {};
-    WGPUCommandBuffer cmd = wgpuCommandEncoderFinish(encoder, &cbDesc);
-    wgpuQueueSubmit(queue, 1, &cmd);
+    wgpu::CommandEncoder encoder = device.createCommandEncoder();
+    wgpu::ComputePassEncoder pass = encoder.beginComputePass();
+    pass.setPipeline (pipeline);
+    pass.setBindGroup (0, bindGroup, 0, nullptr);
+    pass.dispatchWorkgroups (1, 1, 1);
+    pass.end();
+    wgpu::CommandBuffer cmd = encoder.finish();
+    queue.submit (1, &cmd);
 
     // Copy from storage buffer to staging buffer
     {
-        WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(device, nullptr);
-        wgpuCommandEncoderCopyBufferToBuffer(encoder, storage, 0, staging, 0, bufferSize);
-        const WGPUCommandBufferDescriptor cbDesc = {};
-        WGPUCommandBuffer cmd = wgpuCommandEncoderFinish(encoder, &cbDesc);
-        wgpuQueueSubmit(queue, 1, &cmd);
+        wgpu::CommandEncoder encoder = device.createCommandEncoder();
+        encoder.copyBufferToBuffer (storage, 0, staging, 0, bufferSize);
+        wgpu::CommandBuffer cmd = encoder.finish();
+        queue.submit (1, &cmd);
     }
 
     std::atomic<bool> mapped {false};
-    wgpuBufferMapAsync (
-        staging,
+    staging.mapAsync (
         WGPUMapMode_Read,
         0,
         bufferSize,
-        {
+        WGPUBufferMapCallbackInfo {
             .callback =
                 [] (WGPUMapAsyncStatus status, WGPUStringView message, void* userdata1, void* userdata2) {
                     auto* flag = reinterpret_cast<std::atomic<bool>*> (userdata1);
@@ -154,13 +140,17 @@ int main() {
                 },
             .userdata1 = &mapped,
         });
-    wait_until(mapped, instance);
 
-    const void* ptr = wgpuBufferGetConstMappedRange(staging, 0, bufferSize);
+    while (! mapped.load (std::memory_order_acquire)) {
+        instance.processEvents();
+        std::this_thread::sleep_for (std::chrono::milliseconds (1));
+    }
+
+    const void* ptr = staging.getConstMappedRange (0, bufferSize);
     uint32_t value = 0;
     std::memcpy(&value, ptr, sizeof(uint32_t));
     std::printf("Compute result: %u\n", value);
-    wgpuBufferUnmap(staging);
+    staging.unmap();
 
     return 0;
 }
