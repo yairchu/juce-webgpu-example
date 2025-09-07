@@ -34,52 +34,60 @@ int main() {
     WGPURequestAdapterOptions adapterOpts = {};
     adapterOpts.powerPreference = WGPUPowerPreference_HighPerformance;
 
-    auto onAdapter = [](WGPURequestAdapterStatus status, WGPUAdapter a, const char*,
-                        void* userdata) {
-        auto* out = reinterpret_cast<std::pair<WGPUAdapter*, std::atomic<bool>*>*>(userdata);
+    auto onAdapter = [](WGPURequestAdapterStatus status, WGPUAdapter a, WGPUStringView message,
+                        void* userdata1, void* userdata2) {
+        auto* out = reinterpret_cast<std::pair<WGPUAdapter*, std::atomic<bool>*>*>(userdata1);
         if (status == WGPURequestAdapterStatus_Success) {
             *out->first = a;
         }
         out->second->store(true, std::memory_order_release);
     };
     std::pair<WGPUAdapter*, std::atomic<bool>*> adapterOut{&adapter, &gotAdapter};
-    wgpuInstanceRequestAdapter(instance, &adapterOpts, onAdapter, &adapterOut);
+    WGPURequestAdapterCallbackInfo adapterCallback = {};
+    adapterCallback.callback = onAdapter;
+    adapterCallback.userdata1 = &adapterOut;
+    adapterCallback.userdata2 = nullptr;
+    wgpuInstanceRequestAdapter(instance, &adapterOpts, adapterCallback);
     wait_until(gotAdapter);
     assert(adapter);
 
     std::atomic<bool> gotDevice{false};
     WGPUDevice device = nullptr;
     WGPUDeviceDescriptor deviceDesc = {};
-    deviceDesc.label = "MyDevice";
+    deviceDesc.label = WGPUStringView{.data = "MyDevice", .length = 8};
 
-    auto onDevice = [](WGPURequestDeviceStatus status, WGPUDevice d, const char*,
-                       void* userdata) {
-        auto* out = reinterpret_cast<std::pair<WGPUDevice*, std::atomic<bool>*>*>(userdata);
+    auto onDevice = [](WGPURequestDeviceStatus status, WGPUDevice d, WGPUStringView message,
+                       void* userdata1, void* userdata2) {
+        auto* out = reinterpret_cast<std::pair<WGPUDevice*, std::atomic<bool>*>*>(userdata1);
         if (status == WGPURequestDeviceStatus_Success) {
             *out->first = d;
         }
         out->second->store(true, std::memory_order_release);
     };
     std::pair<WGPUDevice*, std::atomic<bool>*> deviceOut{&device, &gotDevice};
-    wgpuAdapterRequestDevice(adapter, &deviceDesc, onDevice, &deviceOut);
+    WGPURequestDeviceCallbackInfo deviceCallback = {};
+    deviceCallback.callback = onDevice;
+    deviceCallback.userdata1 = &deviceOut;
+    deviceCallback.userdata2 = nullptr;
+    wgpuAdapterRequestDevice(adapter, &deviceDesc, deviceCallback);
     wait_until(gotDevice);
     assert(device);
 
-    wgpuDeviceSetUncapturedErrorCallback(device,
-        [](WGPUErrorType type, const char* msg, void*) {
-            std::fprintf(stderr, "[WebGPU Error %d] %s\n", (int)type, msg ? msg : "");
-        }, nullptr);
+    // Note: wgpuDeviceSetUncapturedErrorCallback has been removed in newer WebGPU versions
 
     WGPUQueue queue = wgpuDeviceGetQueue(device);
 
     std::string wgsl = load_text_file("shaders/comp.wgsl");
     assert(!wgsl.empty());
-    WGPUShaderModuleWGSLDescriptor wgslDesc = {};
-    wgslDesc.chain.sType = WGPUSType_ShaderModuleWGSLDescriptor;
-    wgslDesc.code = wgsl.c_str();
+    
+    WGPUShaderSourceWGSL wgslSource = {};
+    wgslSource.chain.next = nullptr;
+    wgslSource.chain.sType = WGPUSType_ShaderSourceWGSL;
+    wgslSource.code = WGPUStringView{.data = wgsl.c_str(), .length = wgsl.length()};
+    
     WGPUShaderModuleDescriptor shaderDesc = {};
-    shaderDesc.nextInChain = reinterpret_cast<const WGPUChainedStruct*>(&wgslDesc);
-    shaderDesc.label = "comp.wgsl";
+    shaderDesc.nextInChain = &wgslSource.chain;
+    shaderDesc.label = WGPUStringView{.data = "comp.wgsl", .length = 9};
     WGPUShaderModule shaderModule = wgpuDeviceCreateShaderModule(device, &shaderDesc);
     assert(shaderModule);
 
@@ -111,7 +119,7 @@ int main() {
     cpDesc.layout = pipelineLayout;
     WGPUProgrammableStageDescriptor stage = {};
     stage.module = shaderModule;
-    stage.entryPoint = "main";
+    stage.entryPoint = WGPUStringView{.data = "main", .length = 4};
     cpDesc.compute = stage;
     WGPUComputePipeline pipeline = wgpuDeviceCreateComputePipeline(device, &cpDesc);
     assert(pipeline);
@@ -140,11 +148,15 @@ int main() {
     wgpuQueueSubmit(queue, 1, &cmd);
 
     std::atomic<bool> mapped{false};
-    auto onMap = [](WGPUBufferMapAsyncStatus status, void* userdata) {
-        auto* flag = reinterpret_cast<std::atomic<bool>*>(userdata);
+    auto onMap = [](WGPUMapAsyncStatus status, WGPUStringView message, void* userdata1, void* userdata2) {
+        auto* flag = reinterpret_cast<std::atomic<bool>*>(userdata1);
         flag->store(true, std::memory_order_release);
     };
-    wgpuBufferMapAsync(storage, WGPUMapMode_Read, 0, bufferSize, onMap, &mapped);
+    WGPUBufferMapCallbackInfo mapCallback = {};
+    mapCallback.callback = onMap;
+    mapCallback.userdata1 = &mapped;
+    mapCallback.userdata2 = nullptr;
+    wgpuBufferMapAsync(storage, WGPUMapMode_Read, 0, bufferSize, mapCallback);
     wait_until(mapped);
 
     const void* ptr = wgpuBufferGetConstMappedRange(storage, 0, bufferSize);
