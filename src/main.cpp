@@ -1,6 +1,6 @@
 #define WEBGPU_CPP_IMPLEMENTATION
 
-#include <webgpu/webgpu.hpp>
+#include <webgpu/webgpu-raii.hpp>
 
 #include <atomic>
 #include <cassert>
@@ -22,13 +22,13 @@ static std::string load_text_file(const char* path) {
 }
 
 int main() {
-    wgpu::Instance instance = wgpu::createInstance();
+    wgpu::raii::Instance instance = wgpu::createInstance();
     assert(instance);
 
-    wgpu::Adapter adapter = instance.requestAdapter({});
+    wgpu::raii::Adapter adapter = instance->requestAdapter ({});
     assert(adapter);
 
-    wgpu::Device device = adapter.requestDevice({});
+    wgpu::Device device = adapter->requestDevice ({});
     assert(device);
 
     // Note: wgpuDeviceSetUncapturedErrorCallback has been removed in newer WebGPU versions
@@ -142,7 +142,7 @@ int main() {
         });
 
     while (! mapped.load (std::memory_order_acquire)) {
-        instance.processEvents();
+        instance->processEvents();
         std::this_thread::sleep_for (std::chrono::milliseconds (1));
     }
 
