@@ -41,6 +41,16 @@ juce_add_gui_app(JuceWebGPUExample
 # Generate config header
 juce_generate_juce_header(JuceWebGPUExample)
 
+# macOS-specific settings to fix code signing issues
+if(APPLE)
+    set_target_properties(JuceWebGPUExample PROPERTIES
+        XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY ""
+        XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED "NO"
+        XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED "NO"
+        XCODE_ATTRIBUTE_DEVELOPMENT_TEAM ""
+    )
+endif()
+
 # Add source files
 target_sources(JuceWebGPUExample
     PRIVATE
