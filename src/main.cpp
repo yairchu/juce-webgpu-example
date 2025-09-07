@@ -46,75 +46,82 @@ int main() {
 
     std::string wgsl = load_text_file("shaders/comp.wgsl");
     assert(!wgsl.empty());
-    
-    WGPUShaderSourceWGSL wgslSource = {};
-    wgslSource.chain.next = nullptr;
-    wgslSource.chain.sType = WGPUSType_ShaderSourceWGSL;
-    wgslSource.code = WGPUStringView{.data = wgsl.c_str(), .length = wgsl.length()};
-    
-    WGPUShaderModuleDescriptor shaderDesc = {};
-    shaderDesc.nextInChain = &wgslSource.chain;
-    shaderDesc.label = WGPUStringView{.data = "comp.wgsl", .length = 9};
+
+    const WGPUShaderSourceWGSL wgslSource {
+        .chain = {.sType = WGPUSType_ShaderSourceWGSL},
+        .code = WGPUStringView {.data = wgsl.c_str(), .length = wgsl.length()},
+    };
+    const WGPUShaderModuleDescriptor shaderDesc {
+        .nextInChain = &wgslSource.chain,
+        .label = WGPUStringView {.data = "comp.wgsl", .length = 9},
+    };
     WGPUShaderModule shaderModule = wgpuDeviceCreateShaderModule(device, &shaderDesc);
     assert(shaderModule);
 
     const uint64_t bufferSize = sizeof(uint32_t);
     
     // Storage buffer for compute shader
-    wgpu::BufferDescriptor storageDesc{};
-    storageDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc;
-    storageDesc.size = bufferSize;
-    storageDesc.mappedAtCreation = false;
-    wgpu::Buffer storage = device.createBuffer(storageDesc);
+    wgpu::Buffer storage = device.createBuffer (
+        WGPUBufferDescriptor {
+            .usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc,
+            .size = bufferSize,
+            .mappedAtCreation = false,
+        });
     assert(storage);
     
     // Staging buffer for reading results
-    wgpu::BufferDescriptor stagingDesc{};
-    stagingDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead;
-    stagingDesc.size = bufferSize;
-    stagingDesc.mappedAtCreation = false;
-    wgpu::Buffer staging = device.createBuffer(stagingDesc);
+    wgpu::Buffer staging = device.createBuffer (
+        WGPUBufferDescriptor {
+            .usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead,
+            .size = bufferSize,
+            .mappedAtCreation = false,
+        });
     assert(staging);
 
-    WGPUBindGroupLayoutEntry bglEntry = {};
-    bglEntry.binding = 0;
-    bglEntry.visibility = WGPUShaderStage_Compute;
-    bglEntry.buffer.type = WGPUBufferBindingType_Storage;
-    bglEntry.buffer.hasDynamicOffset = false;
-    bglEntry.buffer.minBindingSize = bufferSize;
-    WGPUBindGroupLayoutDescriptor bglDesc = {};
-    bglDesc.entryCount = 1;
-    bglDesc.entries = &bglEntry;
+    const WGPUBindGroupLayoutEntry bglEntry {
+        .binding = 0,
+        .visibility = WGPUShaderStage_Compute,
+        .buffer =
+            {
+                .type = WGPUBufferBindingType_Storage,
+                .hasDynamicOffset = false,
+                .minBindingSize = bufferSize,
+            },
+    };
+    const WGPUBindGroupLayoutDescriptor bglDesc {.entryCount = 1, .entries = &bglEntry};
     WGPUBindGroupLayout bgl = wgpuDeviceCreateBindGroupLayout(device, &bglDesc);
 
-    WGPUPipelineLayoutDescriptor plDesc = {};
-    plDesc.bindGroupLayoutCount = 1;
-    plDesc.bindGroupLayouts = &bgl;
+    const WGPUPipelineLayoutDescriptor plDesc {
+        .bindGroupLayoutCount = 1,
+        .bindGroupLayouts = &bgl,
+    };
     WGPUPipelineLayout pipelineLayout = wgpuDeviceCreatePipelineLayout(device, &plDesc);
 
-    WGPUComputePipelineDescriptor cpDesc = {};
-    cpDesc.layout = pipelineLayout;
-    WGPUProgrammableStageDescriptor stage = {};
-    stage.module = shaderModule;
-    stage.entryPoint = WGPUStringView{.data = "main", .length = 4};
-    cpDesc.compute = stage;
+    const WGPUComputePipelineDescriptor cpDesc {
+        .layout = pipelineLayout,
+        .compute = {
+            .module = shaderModule,
+            .entryPoint = WGPUStringView {.data = "main", .length = 4},
+        }};
     WGPUComputePipeline pipeline = wgpuDeviceCreateComputePipeline(device, &cpDesc);
     assert(pipeline);
 
-    WGPUBindGroupEntry bgEntry = {};
-    bgEntry.binding = 0;
-    bgEntry.buffer = storage;
-    bgEntry.offset = 0;
-    bgEntry.size   = bufferSize;
-    WGPUBindGroupDescriptor bgDesc = {};
-    bgDesc.layout = bgl;
-    bgDesc.entryCount = 1;
-    bgDesc.entries = &bgEntry;
+    const WGPUBindGroupEntry bgEntry {
+        .binding = 0,
+        .buffer = storage,
+        .offset = 0,
+        .size = bufferSize,
+    };
+    const WGPUBindGroupDescriptor bgDesc {
+        .layout = bgl,
+        .entryCount = 1,
+        .entries = &bgEntry,
+    };
     WGPUBindGroup bindGroup = wgpuDeviceCreateBindGroup(device, &bgDesc);
 
-    WGPUCommandEncoderDescriptor encDesc = {};
+    const WGPUCommandEncoderDescriptor encDesc {};
     WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(device, &encDesc);
-    WGPUComputePassDescriptor passDesc = {};
+    const WGPUComputePassDescriptor passDesc {};
     WGPUComputePassEncoder pass = wgpuCommandEncoderBeginComputePass(encoder, &passDesc);
     wgpuComputePassEncoderSetPipeline(pass, pipeline);
     wgpuComputePassEncoderSetBindGroup(pass, 0, bindGroup, 0, nullptr);
@@ -128,21 +135,25 @@ int main() {
     {
         WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(device, nullptr);
         wgpuCommandEncoderCopyBufferToBuffer(encoder, storage, 0, staging, 0, bufferSize);
-        WGPUCommandBufferDescriptor cbDesc = {};
+        const WGPUCommandBufferDescriptor cbDesc = {};
         WGPUCommandBuffer cmd = wgpuCommandEncoderFinish(encoder, &cbDesc);
         wgpuQueueSubmit(queue, 1, &cmd);
     }
 
-    std::atomic<bool> mapped{false};
-    auto onMap = [](WGPUMapAsyncStatus status, WGPUStringView message, void* userdata1, void* userdata2) {
-        auto* flag = reinterpret_cast<std::atomic<bool>*>(userdata1);
-        flag->store(true, std::memory_order_release);
-    };
-    WGPUBufferMapCallbackInfo mapCallback = {};
-    mapCallback.callback = onMap;
-    mapCallback.userdata1 = &mapped;
-    mapCallback.userdata2 = nullptr;
-    wgpuBufferMapAsync(staging, WGPUMapMode_Read, 0, bufferSize, mapCallback);
+    std::atomic<bool> mapped {false};
+    wgpuBufferMapAsync (
+        staging,
+        WGPUMapMode_Read,
+        0,
+        bufferSize,
+        {
+            .callback =
+                [] (WGPUMapAsyncStatus status, WGPUStringView message, void* userdata1, void* userdata2) {
+                    auto* flag = reinterpret_cast<std::atomic<bool>*> (userdata1);
+                    flag->store (true, std::memory_order_release);
+                },
+            .userdata1 = &mapped,
+        });
     wait_until(mapped, instance);
 
     const void* ptr = wgpuBufferGetConstMappedRange(staging, 0, bufferSize);
