@@ -31,9 +31,18 @@ MainComponent::MainComponent()
 
 MainComponent::~MainComponent()
 {
+    // Stop the timer first to prevent new render calls
     stopTimer();
+
+    // Mark as not initialized to prevent further operations
+    isInitialized = false;
+
+    // Shutdown WebGPU before OpenGL context is destroyed
     if (webgpuGraphics)
+    {
         webgpuGraphics->shutdown();
+        webgpuGraphics.reset(); // Explicitly release the unique_ptr
+    }
 }
 
 void MainComponent::paint (juce::Graphics& g)
@@ -70,7 +79,8 @@ void MainComponent::resized()
 
 void MainComponent::timerCallback()
 {
-    if (isInitialized && webgpuGraphics)
+    // Check both flags to prevent rendering during shutdown
+    if (isInitialized && webgpuGraphics && webgpuGraphics->isInitialized())
     {
         renderGraphics();
     }
@@ -81,7 +91,7 @@ void MainComponent::renderGraphics()
     // Render frame on background thread to avoid blocking UI
     std::thread ([this]()
                  {
-        juce::Image newImage = webgpuGraphics->renderFrame();
+        juce::Image newImage = webgpuGraphics->renderFrameToImage();
         
         juce::MessageManager::callAsync([this, newImage]() {
             renderedImage = newImage;

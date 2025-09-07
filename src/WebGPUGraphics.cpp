@@ -196,6 +196,8 @@ bool WebGPUGraphics::createPipeline()
 
 void WebGPUGraphics::resize (int width, int height)
 {
+    std::lock_guard<std::mutex> lock (textureMutex);
+
     if (! initialized || (width == textureWidth && height == textureHeight))
         return;
 
@@ -206,37 +208,56 @@ void WebGPUGraphics::resize (int width, int height)
     createTexture (width, height);
 }
 
-juce::Image WebGPUGraphics::renderFrame()
+void WebGPUGraphics::renderFrame()
 {
-    if (! initialized)
+    if (! initialized.load() || shutdownRequested.load())
+        return;
+
+    std::lock_guard<std::mutex> lock (textureMutex);
+
+    // Double-check after acquiring lock
+    if (! initialized.load() || shutdownRequested.load())
+        return;
+
+    // GPU-only rendering - no CPU readback
+    wgpu::raii::CommandEncoder encoder = device->createCommandEncoder();
+
+    WGPURenderPassColorAttachment colorAttachment = {
+        .view = *renderTextureView,
+        .resolveTarget = nullptr,
+        .loadOp = WGPULoadOp_Clear,
+        .storeOp = WGPUStoreOp_Store,
+        .clearValue = { 0.1f, 0.1f, 0.1f, 1.0f }, // Dark gray background
+    };
+
+    WGPURenderPassDescriptor renderPassDesc = {
+        .colorAttachmentCount = 1,
+        .colorAttachments = &colorAttachment,
+        .depthStencilAttachment = nullptr,
+    };
+
+    wgpu::raii::RenderPassEncoder pass = encoder->beginRenderPass (renderPassDesc);
+    pass->setPipeline (*renderPipeline);
+    pass->setVertexBuffer (0, *vertexBuffer, 0, WGPU_WHOLE_SIZE);
+    pass->draw (3, 1, 0, 0); // Draw 3 vertices
+    pass->end();
+
+    queue->submit (1, &*wgpu::raii::CommandBuffer (encoder->finish()));
+}
+
+juce::Image WebGPUGraphics::renderFrameToImage()
+{
+    if (! initialized.load() || shutdownRequested.load())
         return {};
 
-    // Render to texture
-    {
-        wgpu::raii::CommandEncoder encoder = device->createCommandEncoder();
+    // First render to GPU texture
+    renderFrame();
 
-        WGPURenderPassColorAttachment colorAttachment = {
-            .view = *renderTextureView,
-            .resolveTarget = nullptr,
-            .loadOp = WGPULoadOp_Clear,
-            .storeOp = WGPUStoreOp_Store,
-            .clearValue = { 0.1f, 0.1f, 0.1f, 1.0f }, // Dark gray background
-        };
+    std::lock_guard<std::mutex> lock (textureMutex);
 
-        WGPURenderPassDescriptor renderPassDesc = {
-            .colorAttachmentCount = 1,
-            .colorAttachments = &colorAttachment,
-            .depthStencilAttachment = nullptr,
-        };
-
-        wgpu::raii::RenderPassEncoder pass = encoder->beginRenderPass (renderPassDesc);
-        pass->setPipeline (*renderPipeline);
-        pass->setVertexBuffer (0, *vertexBuffer, 0, WGPU_WHOLE_SIZE);
-        pass->draw (3, 1, 0, 0); // Draw 3 vertices
-        pass->end();
-
-        queue->submit (1, &*wgpu::raii::CommandBuffer (encoder->finish()));
-    }
+    // Double-check after acquiring lock
+    if (! initialized.load() || shutdownRequested.load())
+        return {};
 
     // Read back the texture data directly from render texture
     // WebGPU requires bytes per row to be aligned to 256 bytes
@@ -289,12 +310,16 @@ juce::Image WebGPUGraphics::renderFrame()
                                              .userdata1 = &mapped,
                                          });
 
-    // Wait for mapping to complete
-    while (! mapped.load (std::memory_order_acquire))
+    // Wait for mapping to complete, but check for shutdown
+    while (! mapped.load (std::memory_order_acquire) && ! shutdownRequested.load())
     {
         instance->processEvents();
         std::this_thread::sleep_for (std::chrono::milliseconds (1));
     }
+
+    // If shutdown was requested, abort the operation
+    if (shutdownRequested.load())
+        return {};
 
     const void* ptr = readbackBuffer->getConstMappedRange (0, bufferSize);
 
@@ -320,14 +345,58 @@ juce::Image WebGPUGraphics::renderFrame()
 
 void WebGPUGraphics::shutdown()
 {
-    initialized = false;
-    renderTextureView = {};
-    renderTexture = {};
-    renderPipeline = {};
-    vertexBuffer = {};
-    fragmentShader = {};
-    vertexShader = {};
-    queue = {};
-    device = {};
-    instance = {};
+    // Signal shutdown to all operations first
+    shutdownRequested.store (true);
+
+    // Acquire lock to ensure no rendering operations are in progress
+    std::lock_guard<std::mutex> lock (textureMutex);
+
+    if (! initialized.load())
+        return;
+
+    juce::Logger::writeToLog ("WebGPU shutdown starting...");
+
+    // Wait for any pending GPU operations to complete
+    if (queue)
+    {
+        try
+        {
+            // Submit an empty command buffer to flush the queue
+            wgpu::raii::CommandEncoder encoder = device->createCommandEncoder();
+            queue->submit (1, &*wgpu::raii::CommandBuffer (encoder->finish()));
+
+            // Process events to ensure completion
+            for (int i = 0; i < 100 && instance; ++i) // Max 100ms timeout
+            {
+                instance->processEvents();
+                std::this_thread::sleep_for (std::chrono::milliseconds (1));
+            }
+        }
+        catch (...)
+        {
+            juce::Logger::writeToLog ("Exception during WebGPU queue flush");
+        }
+    }
+
+    // Clean up resources in reverse order of creation
+    initialized.store (false);
+
+    try
+    {
+        renderTextureView = {};
+        renderTexture = {};
+        renderPipeline = {};
+        vertexBuffer = {};
+        fragmentShader = {};
+        vertexShader = {};
+        queue = {};
+        device = {};
+        instance = {};
+    }
+    catch (...)
+    {
+        juce::Logger::writeToLog ("Exception during WebGPU resource cleanup");
+    }
+
+    juce::Logger::writeToLog ("WebGPU shutdown completed");
 }
