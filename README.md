@@ -20,27 +20,6 @@ cmake ..
 cmake --build .
 ```
 
-## Dependencies
-
-The following dependencies are automatically downloaded and configured:
-
-- [JUCE](https://github.com/juce-framework/JUCE) - Audio application framework
-- [WebGPU-distribution](https://github.com/eliemichel/WebGPU-distribution) - WebGPU bindings
-
-## Project Structure
-
-```text
-├── CMakeLists.txt          # Build configuration
-├── src/
-│   ├── main.cpp           # JUCE application entry point
-│   ├── MainComponent.h    # Main GUI component header
-│   ├── MainComponent.cpp  # Main GUI component implementation
-│   ├── WebGPUCompute.h    # WebGPU compute wrapper header
-│   └── WebGPUCompute.cpp  # WebGPU compute wrapper implementation
-└── shaders/
-    └── comp.wgsl          # WebGPU compute shader
-```
-
 ## Usage
 
 1. Build and run the application
