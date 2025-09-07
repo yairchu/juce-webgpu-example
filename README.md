@@ -1,13 +1,14 @@
 # JUCE WebGPU Example
 
-This is a JUCE application that demonstrates WebGPU compute shader integration using [WebGPU-distribution](https://github.com/eliemichel/WebGPU-distribution)'s RAII wrappers. The application provides a GUI interface to run WebGPU compute shaders and display the results.
+This is a JUCE application that demonstrates WebGPU graphics rendering using [WebGPU-distribution](https://github.com/eliemichel/WebGPU-distribution)'s RAII wrappers. The application provides a GUI interface to render graphics using WebGPU and display them in real-time.
 
 ## Features
 
 - JUCE GUI application framework
-- WebGPU compute shader integration
-- Asynchronous compute execution
+- WebGPU graphics rendering integration
+- Real-time rendering at ~60 FPS
 - Cross-platform compatibility (macOS, Windows, Linux)
+- Colorful animated triangle example
 
 ## Building
 
@@ -24,7 +25,8 @@ cmake --build .
 
 1. Build and run the application
 2. Wait for WebGPU initialization to complete
-3. Click "Run WebGPU Compute" to execute the compute shader
-4. The result (1337) will be displayed in the GUI
+3. The application will automatically start rendering a colorful triangle
+4. The triangle is rendered using WebGPU vertex and fragment shaders
+5. The rendered image is displayed in the JUCE GUI in real-time
 
-The compute shader simply writes the value 1337 to a storage buffer, demonstrating the basic WebGPU compute workflow within a JUCE application.
+The graphics renderer creates a triangle with vertices colored red, green, and blue, demonstrating the basic WebGPU graphics pipeline within a JUCE application.

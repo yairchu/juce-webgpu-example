@@ -1,9 +1,9 @@
 #pragma once
 
-#include "WebGPUCompute.h"
+#include "WebGPUGraphics.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
-class MainComponent : public juce::Component
+class MainComponent : public juce::Component, private juce::Timer
 {
 public:
     MainComponent();
@@ -13,16 +13,15 @@ public:
     void resized() override;
 
 private:
-    void runCompute();
-    void onComputeResult (uint32_t result);
+    void timerCallback() override;
+    void renderGraphics();
 
-    std::unique_ptr<WebGPUCompute> webgpuCompute;
+    std::unique_ptr<WebGPUGraphics> webgpuGraphics;
 
-    juce::TextButton runButton;
     juce::Label statusLabel;
-    juce::Label resultLabel;
+    juce::Image renderedImage;
 
-    bool isComputing = false;
+    bool isInitialized = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)
 };
