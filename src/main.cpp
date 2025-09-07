@@ -42,7 +42,7 @@ int main() {
 
     // Note: wgpuDeviceSetUncapturedErrorCallback has been removed in newer WebGPU versions
 
-    WGPUQueue queue = wgpuDeviceGetQueue(device);
+    wgpu::Queue queue = device.getQueue();
 
     std::string wgsl = load_text_file("shaders/comp.wgsl");
     assert(!wgsl.empty());
