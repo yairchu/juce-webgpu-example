@@ -12,7 +12,6 @@
 #include <sstream>
 #include <string>
 #include <thread>
-#include <vector>
 
 static std::string load_text_file(const char* path) {
     std::ifstream f(path);
@@ -25,15 +24,10 @@ int main() {
     wgpu::raii::Instance instance = wgpu::createInstance();
     assert(instance);
 
-    wgpu::raii::Adapter adapter = instance->requestAdapter ({});
-    assert(adapter);
-
-    wgpu::raii::Device device = adapter->requestDevice ({});
+    wgpu::raii::Device device = wgpu::raii::Adapter (instance->requestAdapter ({}))->requestDevice ({});
     assert(device);
 
-    // Note: wgpuDeviceSetUncapturedErrorCallback has been removed in newer WebGPU versions
-
-    wgpu::Queue queue = device->getQueue();
+    wgpu::raii::Queue queue = device->getQueue();
 
     std::string wgsl = load_text_file("shaders/comp.wgsl");
     assert(!wgsl.empty());
@@ -47,8 +41,7 @@ int main() {
         .label = wgpu::StringView ("comp.wgsl"),
     };
     // For a mysterious reason this fails when using device->createShaderModule(shaderDesc)
-    wgpu::raii::ShaderModule shaderModule =
-        wgpu::raii::ShaderModule (wgpuDeviceCreateShaderModule (*device, &shaderDesc));
+    wgpu::raii::ShaderModule shaderModule (wgpuDeviceCreateShaderModule (*device, &shaderDesc));
     assert(shaderModule);
 
     const uint64_t bufferSize = sizeof(uint32_t);
@@ -89,7 +82,7 @@ int main() {
             .bindGroupLayoutCount = 1,
             .bindGroupLayouts = &(WGPUBindGroupLayout&) *bgl,
         });
-    wgpu::ComputePipeline pipeline = device->createComputePipeline (
+    wgpu::raii::ComputePipeline pipeline = device->createComputePipeline (
         WGPUComputePipelineDescriptor {
             .layout = *pipelineLayout,
             .compute = {
@@ -98,34 +91,34 @@ int main() {
             }});
     assert(pipeline);
 
-    const WGPUBindGroupEntry bgEntry {
-        .binding = 0,
-        .buffer = *storage,
-        .offset = 0,
-        .size = bufferSize,
-    };
-    wgpu::BindGroup bindGroup = device->createBindGroup (
-        WGPUBindGroupDescriptor {
-            .layout = *bgl,
-            .entryCount = 1,
-            .entries = &bgEntry,
-        });
+    {
+        const WGPUBindGroupEntry bgEntry {
+            .binding = 0,
+            .buffer = *storage,
+            .offset = 0,
+            .size = bufferSize,
+        };
+        wgpu::raii::BindGroup bindGroup = device->createBindGroup (
+            WGPUBindGroupDescriptor {
+                .layout = *bgl,
+                .entryCount = 1,
+                .entries = &bgEntry,
+            });
 
-    wgpu::CommandEncoder encoder = device->createCommandEncoder();
-    wgpu::ComputePassEncoder pass = encoder.beginComputePass();
-    pass.setPipeline (pipeline);
-    pass.setBindGroup (0, bindGroup, 0, nullptr);
-    pass.dispatchWorkgroups (1, 1, 1);
-    pass.end();
-    wgpu::CommandBuffer cmd = encoder.finish();
-    queue.submit (1, &cmd);
+        wgpu::raii::CommandEncoder encoder = device->createCommandEncoder();
+        wgpu::raii::ComputePassEncoder pass = encoder->beginComputePass();
+        pass->setPipeline (*pipeline);
+        pass->setBindGroup (0, *bindGroup, 0, nullptr);
+        pass->dispatchWorkgroups (1, 1, 1);
+        pass->end();
+        queue->submit (1, &*wgpu::raii::CommandBuffer (encoder->finish()));
+    }
 
     // Copy from storage buffer to staging buffer
     {
-        wgpu::CommandEncoder encoder = device->createCommandEncoder();
-        encoder.copyBufferToBuffer (*storage, 0, *staging, 0, bufferSize);
-        wgpu::CommandBuffer cmd = encoder.finish();
-        queue.submit (1, &cmd);
+        wgpu::raii::CommandEncoder encoder = device->createCommandEncoder();
+        encoder->copyBufferToBuffer (*storage, 0, *staging, 0, bufferSize);
+        queue->submit (1, &*wgpu::raii::CommandBuffer (encoder->finish()));
     }
 
     std::atomic<bool> mapped {false};
