@@ -10,7 +10,7 @@ include(FetchContent)
 FetchContent_Declare(
   webgpu_dist
   GIT_REPOSITORY https://github.com/eliemichel/WebGPU-distribution.git
-  GIT_TAG        v0.2.0
+  GIT_TAG        17dcd42a7683355e7a40ac4e97e77f36dff5b5ab
 )
 FetchContent_MakeAvailable(webgpu_dist)
 
