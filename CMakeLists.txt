@@ -57,10 +57,9 @@ target_sources(JuceWebGPUExample
         src/main.cpp
         src/MainComponent.h
         src/MainComponent.cpp
-        src/WebGPUCompute.h
-        src/WebGPUCompute.cpp
         src/WebGPUGraphics.h
         src/WebGPUGraphics.cpp
+        src/WebGPUImpl.cpp
 )
 
 # Link JUCE modules
