@@ -47,7 +47,8 @@ int main() {
         .label = wgpu::StringView ("comp.wgsl"),
     };
     // For a mysterious reason this fails when using device->createShaderModule(shaderDesc)
-    wgpu::ShaderModule shaderModule = wgpuDeviceCreateShaderModule (*device, &shaderDesc);
+    wgpu::raii::ShaderModule shaderModule =
+        wgpu::raii::ShaderModule (wgpuDeviceCreateShaderModule (*device, &shaderDesc));
     assert(shaderModule);
 
     const uint64_t bufferSize = sizeof(uint32_t);
@@ -80,19 +81,19 @@ int main() {
                 .minBindingSize = bufferSize,
             },
     };
-    wgpu::BindGroupLayout bgl =
+    wgpu::raii::BindGroupLayout bgl =
         device->createBindGroupLayout (WGPUBindGroupLayoutDescriptor {.entryCount = 1, .entries = &bglEntry});
 
-    wgpu::PipelineLayout pipelineLayout = device->createPipelineLayout (
+    wgpu::raii::PipelineLayout pipelineLayout = device->createPipelineLayout (
         WGPUPipelineLayoutDescriptor {
             .bindGroupLayoutCount = 1,
-            .bindGroupLayouts = &(WGPUBindGroupLayout&) bgl,
+            .bindGroupLayouts = &(WGPUBindGroupLayout&) *bgl,
         });
     wgpu::ComputePipeline pipeline = device->createComputePipeline (
         WGPUComputePipelineDescriptor {
-            .layout = pipelineLayout,
+            .layout = *pipelineLayout,
             .compute = {
-                .module = shaderModule,
+                .module = *shaderModule,
                 .entryPoint = wgpu::StringView ("main"),
             }});
     assert(pipeline);
@@ -105,7 +106,7 @@ int main() {
     };
     wgpu::BindGroup bindGroup = device->createBindGroup (
         WGPUBindGroupDescriptor {
-            .layout = bgl,
+            .layout = *bgl,
             .entryCount = 1,
             .entries = &bgEntry,
         });
