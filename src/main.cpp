@@ -18,8 +18,11 @@ static std::string load_text_file(const char* path) {
     return ss.str();
 }
 
-static void wait_until(std::atomic<bool>& flag) {
+static void wait_until(std::atomic<bool>& flag, WGPUInstance instance = nullptr) {
     while (!flag.load(std::memory_order_acquire)) {
+        if (instance) {
+            wgpuInstanceProcessEvents(instance);
+        }
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 }
@@ -176,7 +179,7 @@ int main() {
     mapCallback.userdata1 = &mapped;
     mapCallback.userdata2 = nullptr;
     wgpuBufferMapAsync(staging, WGPUMapMode_Read, 0, bufferSize, mapCallback);
-    wait_until(mapped);
+    wait_until(mapped, instance);
 
     const void* ptr = wgpuBufferGetConstMappedRange(staging, 0, bufferSize);
     uint32_t value = 0;
