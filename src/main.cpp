@@ -1,15 +1,18 @@
-#include <webgpu/webgpu.h>
+#define WEBGPU_CPP_IMPLEMENTATION
+
+#include <webgpu/webgpu.hpp>
+
+#include <atomic>
 #include <cassert>
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
-#include <string>
-#include <vector>
-#include <atomic>
-#include <thread>
-#include <chrono>
 #include <fstream>
 #include <sstream>
+#include <string>
+#include <thread>
+#include <vector>
 
 static std::string load_text_file(const char* path) {
     std::ifstream f(path);
@@ -29,7 +32,7 @@ static void wait_until(std::atomic<bool>& flag, WGPUInstance instance = nullptr)
 
 int main() {
     WGPUInstanceDescriptor instanceDesc = {};
-    WGPUInstance instance = wgpuCreateInstance(&instanceDesc);
+    wgpu::Instance instance = wgpu::createInstance (instanceDesc);
     assert(instance);
 
     std::atomic<bool> gotAdapter{false};
