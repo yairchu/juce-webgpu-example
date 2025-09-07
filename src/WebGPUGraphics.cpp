@@ -1,5 +1,3 @@
-#define WEBGPU_CPP_IMPLEMENTATION
-
 #include "WebGPUGraphics.h"
 #include <cassert>
 #include <chrono>
@@ -164,7 +162,7 @@ bool WebGPUGraphics::createVertexBuffer()
     std::memcpy (mappedData, vertices, sizeof (vertices));
     vertexBuffer->unmap();
 
-    return vertexBuffer != nullptr;
+    return *vertexBuffer != nullptr;
 }
 
 bool WebGPUGraphics::createPipeline()
@@ -225,7 +223,7 @@ bool WebGPUGraphics::createPipeline()
         },
     });
 
-    return renderPipeline != nullptr;
+    return *renderPipeline != nullptr;
 }
 
 void WebGPUGraphics::resize (int width, int height)
@@ -272,31 +270,31 @@ juce::Image WebGPUGraphics::renderFrame()
             pass->end();
 
             // Copy render texture to readback texture
-            encoder->copyTextureToTexture (
-                WGPUImageCopyTexture {
-                    .texture = *renderTexture,
-                    .mipLevel = 0,
-                    .origin = { 0, 0, 0 },
-                    .aspect = WGPUTextureAspect_All,
-                },
-                WGPUImageCopyTexture {
-                    .texture = *readbackTexture,
-                    .mipLevel = 0,
-                    .origin = { 0, 0, 0 },
-                    .aspect = WGPUTextureAspect_All,
-                },
-                WGPUExtent3D {
-                    .width = static_cast<uint32_t> (textureWidth),
-                    .height = static_cast<uint32_t> (textureHeight),
-                    .depthOrArrayLayers = 1,
-                });
+            //            encoder->copyTextureToTexture (
+            //                WGPUImageCopyTexture {
+            //                    .texture = *renderTexture,
+            //                    .mipLevel = 0,
+            //                    .origin = { 0, 0, 0 },
+            //                    .aspect = WGPUTextureAspect_All,
+            //                },
+            //                WGPUImageCopyTexture {
+            //                    .texture = *readbackTexture,
+            //                    .mipLevel = 0,
+            //                    .origin = { 0, 0, 0 },
+            //                    .aspect = WGPUTextureAspect_All,
+            //                },
+            //                WGPUExtent3D {
+            //                    .width = static_cast<uint32_t> (textureWidth),
+            //                    .height = static_cast<uint32_t> (textureHeight),
+            //                    .depthOrArrayLayers = 1,
+            //                });
 
             queue->submit (1, &*wgpu::raii::CommandBuffer (encoder->finish()));
         }
 
         // Read back the texture data
-        const uint32_t bytesPerRow = textureWidth * bytesPerPixel;
-        const uint32_t bufferSize = bytesPerRow * textureHeight;
+        const uint32_t bytesPerRow = (uint32_t) textureWidth * bytesPerPixel;
+        const uint32_t bufferSize = bytesPerRow * (uint32_t) textureHeight;
 
         wgpu::raii::Buffer readbackBuffer = device->createBuffer (WGPUBufferDescriptor {
             .usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead,
@@ -307,26 +305,26 @@ juce::Image WebGPUGraphics::renderFrame()
         // Copy texture to buffer
         {
             wgpu::raii::CommandEncoder encoder = device->createCommandEncoder();
-            encoder->copyTextureToBuffer (
-                WGPUImageCopyTexture {
-                    .texture = *readbackTexture,
-                    .mipLevel = 0,
-                    .origin = { 0, 0, 0 },
-                    .aspect = WGPUTextureAspect_All,
-                },
-                WGPUImageCopyBuffer {
-                    .buffer = *readbackBuffer,
-                    .layout = {
-                        .offset = 0,
-                        .bytesPerRow = bytesPerRow,
-                        .rowsPerImage = static_cast<uint32_t> (textureHeight),
-                    },
-                },
-                WGPUExtent3D {
-                    .width = static_cast<uint32_t> (textureWidth),
-                    .height = static_cast<uint32_t> (textureHeight),
-                    .depthOrArrayLayers = 1,
-                });
+            //            encoder->copyTextureToBuffer (
+            //                WGPUImageCopyTexture {
+            //                    .texture = *readbackTexture,
+            //                    .mipLevel = 0,
+            //                    .origin = { 0, 0, 0 },
+            //                    .aspect = WGPUTextureAspect_All,
+            //                },
+            //                WGPUImageCopyBuffer {
+            //                    .buffer = *readbackBuffer,
+            //                    .layout = {
+            //                        .offset = 0,
+            //                        .bytesPerRow = bytesPerRow,
+            //                        .rowsPerImage = static_cast<uint32_t> (textureHeight),
+            //                    },
+            //                },
+            //                WGPUExtent3D {
+            //                    .width = static_cast<uint32_t> (textureWidth),
+            //                    .height = static_cast<uint32_t> (textureHeight),
+            //                    .depthOrArrayLayers = 1,
+            //                });
             queue->submit (1, &*wgpu::raii::CommandBuffer (encoder->finish()));
         }
 
