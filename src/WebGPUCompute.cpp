@@ -1,8 +1,12 @@
+#define WEBGPU_CPP_IMPLEMENTATION
+
 #include "WebGPUCompute.h"
 #include <cassert>
 #include <cstring>
 #include <chrono>
 #include <thread>
+
+#include <juce_events/juce_events.h>
 
 WebGPUCompute::WebGPUCompute() = default;
 WebGPUCompute::~WebGPUCompute() = default;

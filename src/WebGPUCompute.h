@@ -1,6 +1,5 @@
 #pragma once
 
-#define WEBGPU_CPP_IMPLEMENTATION
 #include <webgpu/webgpu-raii.hpp>
 #include <juce_core/juce_core.h>
 #include <memory>
