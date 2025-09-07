@@ -15,16 +15,14 @@ MainComponent::MainComponent()
     // Initialize WebGPU on background thread
     std::thread ([this]()
                  {
-        bool success = webgpuGraphics->initialize(400, 300);
+        bool success = webgpuGraphics->initialize(getWidth(), getHeight());
         juce::MessageManager::callAsync([this, success]() {
-            if (success)
-            {
-                statusLabel.setText("WebGPU initialized! Rendering triangle...", juce::dontSendNotification);
+            if (success) {
+                statusLabel.setText("WebGPU initialized successfully!", juce::dontSendNotification);
                 isInitialized = true;
+                // Start timer for continuous rendering
                 startTimer(16); // ~60 FPS
-            }
-            else
-            {
+            } else {
                 statusLabel.setText("Failed to initialize WebGPU", juce::dontSendNotification);
             }
         }); })
@@ -42,42 +40,31 @@ void MainComponent::paint (juce::Graphics& g)
 {
     g.fillAll (getLookAndFeel().findColour (juce::ResizableWindow::backgroundColourId));
 
-    g.setColour (juce::Colours::white);
-    g.setFont (20.0f);
-    g.drawText ("JUCE WebGPU Graphics Example", getLocalBounds().removeFromTop (60), juce::Justification::centred, true);
-
-    // Draw the WebGPU rendered image if available
-    if (renderedImage.isValid())
+    if (isInitialized && ! renderedImage.isNull())
     {
-        auto bounds = getLocalBounds();
-        bounds.removeFromTop (100); // Space for title and status
-        bounds.removeFromBottom (50); // Space for status
-
-        // Center the image
-        auto imageArea = bounds.withSizeKeepingCentre (
-            juce::jmin (bounds.getWidth(), renderedImage.getWidth()),
-            juce::jmin (bounds.getHeight(), renderedImage.getHeight()));
-
-        g.drawImage (renderedImage, imageArea.toFloat());
+        // Draw the WebGPU rendered image
+        g.drawImage (renderedImage, getLocalBounds().toFloat());
+    }
+    else
+    {
+        g.setColour (juce::Colours::white);
+        g.setFont (20.0f);
+        g.drawText ("JUCE WebGPU Graphics Example", getLocalBounds().removeFromTop (60), juce::Justification::centred, true);
     }
 }
 
 void MainComponent::resized()
 {
     auto bounds = getLocalBounds();
-    bounds.removeFromTop (80); // Space for title
 
-    auto statusArea = bounds.removeFromBottom (30);
+    // Position status label at top
+    auto statusArea = bounds.removeFromTop (30);
     statusLabel.setBounds (statusArea);
 
-    // Update graphics renderer size if needed
+    // Resize WebGPU graphics if initialized
     if (isInitialized && webgpuGraphics)
     {
-        auto renderArea = bounds.reduced (50);
-        if (renderArea.getWidth() > 0 && renderArea.getHeight() > 0)
-        {
-            webgpuGraphics->resize (renderArea.getWidth(), renderArea.getHeight());
-        }
+        webgpuGraphics->resize (getWidth(), getHeight() - 30); // Account for status label
     }
 }
 
@@ -91,20 +78,14 @@ void MainComponent::timerCallback()
 
 void MainComponent::renderGraphics()
 {
-    // Render on background thread to avoid blocking UI
+    // Render frame on background thread to avoid blocking UI
     std::thread ([this]()
                  {
-        if (webgpuGraphics && webgpuGraphics->isInitialized())
-        {
-            auto newImage = webgpuGraphics->renderFrame();
-            
-            juce::MessageManager::callAsync([this, newImage]() {
-                if (newImage.isValid())
-                {
-                    renderedImage = newImage;
-                    repaint();
-                }
-            });
-        } })
+        juce::Image newImage = webgpuGraphics->renderFrame();
+        
+        juce::MessageManager::callAsync([this, newImage]() {
+            renderedImage = newImage;
+            repaint();
+        }); })
         .detach();
 }

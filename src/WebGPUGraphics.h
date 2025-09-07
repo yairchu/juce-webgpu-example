@@ -38,7 +38,6 @@ private:
     wgpu::raii::TextureView renderTextureView;
     wgpu::raii::Buffer vertexBuffer;
     wgpu::raii::RenderPipeline renderPipeline;
-    wgpu::raii::Texture readbackTexture;
 
     static constexpr uint32_t bytesPerPixel = 4; // RGBA8
 };

@@ -124,17 +124,8 @@ bool WebGPUGraphics::createTexture (int width, int height)
 
     renderTextureView = renderTexture->createView();
 
-    // Create readback texture
-    readbackTexture = device->createTexture (WGPUTextureDescriptor {
-        .usage = wgpu::TextureUsage::CopyDst | wgpu::TextureUsage::CopySrc,
-        .dimension = WGPUTextureDimension_2D,
-        .size = { static_cast<uint32_t> (width), static_cast<uint32_t> (height), 1 },
-        .format = WGPUTextureFormat_RGBA8Unorm,
-        .mipLevelCount = 1,
-        .sampleCount = 1,
-    });
-
-    return renderTexture && renderTextureView && readbackTexture;
+    // No longer need readback texture - we copy directly from render texture to buffer
+    return renderTexture && renderTextureView;
 }
 
 bool WebGPUGraphics::createVertexBuffer()
@@ -269,31 +260,14 @@ juce::Image WebGPUGraphics::renderFrame()
             pass->draw (3, 1, 0, 0); // Draw 3 vertices
             pass->end();
 
-            // Copy render texture to readback texture
-            //            encoder->copyTextureToTexture (
-            //                WGPUImageCopyTexture {
-            //                    .texture = *renderTexture,
-            //                    .mipLevel = 0,
-            //                    .origin = { 0, 0, 0 },
-            //                    .aspect = WGPUTextureAspect_All,
-            //                },
-            //                WGPUImageCopyTexture {
-            //                    .texture = *readbackTexture,
-            //                    .mipLevel = 0,
-            //                    .origin = { 0, 0, 0 },
-            //                    .aspect = WGPUTextureAspect_All,
-            //                },
-            //                WGPUExtent3D {
-            //                    .width = static_cast<uint32_t> (textureWidth),
-            //                    .height = static_cast<uint32_t> (textureHeight),
-            //                    .depthOrArrayLayers = 1,
-            //                });
-
             queue->submit (1, &*wgpu::raii::CommandBuffer (encoder->finish()));
         }
 
-        // Read back the texture data
-        const uint32_t bytesPerRow = (uint32_t) textureWidth * bytesPerPixel;
+        // Read back the texture data directly from render texture
+        // WebGPU requires bytes per row to be aligned to 256 bytes
+        const uint32_t unalignedBytesPerRow = (uint32_t) textureWidth * bytesPerPixel;
+        const uint32_t alignment = 256;
+        const uint32_t bytesPerRow = ((unalignedBytesPerRow + alignment - 1) / alignment) * alignment;
         const uint32_t bufferSize = bytesPerRow * (uint32_t) textureHeight;
 
         wgpu::raii::Buffer readbackBuffer = device->createBuffer (WGPUBufferDescriptor {
@@ -302,29 +276,29 @@ juce::Image WebGPUGraphics::renderFrame()
             .mappedAtCreation = false,
         });
 
-        // Copy texture to buffer
+        // Copy render texture directly to buffer (no intermediate texture needed)
         {
             wgpu::raii::CommandEncoder encoder = device->createCommandEncoder();
-            //            encoder->copyTextureToBuffer (
-            //                WGPUImageCopyTexture {
-            //                    .texture = *readbackTexture,
-            //                    .mipLevel = 0,
-            //                    .origin = { 0, 0, 0 },
-            //                    .aspect = WGPUTextureAspect_All,
-            //                },
-            //                WGPUImageCopyBuffer {
-            //                    .buffer = *readbackBuffer,
-            //                    .layout = {
-            //                        .offset = 0,
-            //                        .bytesPerRow = bytesPerRow,
-            //                        .rowsPerImage = static_cast<uint32_t> (textureHeight),
-            //                    },
-            //                },
-            //                WGPUExtent3D {
-            //                    .width = static_cast<uint32_t> (textureWidth),
-            //                    .height = static_cast<uint32_t> (textureHeight),
-            //                    .depthOrArrayLayers = 1,
-            //                });
+            encoder->copyTextureToBuffer (
+                WGPUTexelCopyTextureInfo {
+                    .texture = *renderTexture, // Copy directly from render texture
+                    .mipLevel = 0,
+                    .origin = { 0, 0, 0 },
+                    .aspect = WGPUTextureAspect_All,
+                },
+                WGPUTexelCopyBufferInfo {
+                    .buffer = *readbackBuffer,
+                    .layout = {
+                        .offset = 0,
+                        .bytesPerRow = bytesPerRow,
+                        .rowsPerImage = static_cast<uint32_t> (textureHeight),
+                    },
+                },
+                WGPUExtent3D {
+                    .width = static_cast<uint32_t> (textureWidth),
+                    .height = static_cast<uint32_t> (textureHeight),
+                    .depthOrArrayLayers = 1,
+                });
             queue->submit (1, &*wgpu::raii::CommandBuffer (encoder->finish()));
         }
 
@@ -354,12 +328,14 @@ juce::Image WebGPUGraphics::renderFrame()
         juce::Image::BitmapData bitmap (image, juce::Image::BitmapData::writeOnly);
 
         // Copy pixel data (WebGPU uses RGBA, JUCE uses ARGB)
+        // Account for potential row padding due to alignment
         const uint8_t* src = static_cast<const uint8_t*> (ptr);
         for (int y = 0; y < textureHeight; ++y)
         {
             for (int x = 0; x < textureWidth; ++x)
             {
-                const int srcIndex = (y * textureWidth + x) * 4;
+                // Use aligned bytes per row for source indexing
+                const int srcIndex = (y * (int) bytesPerRow) + (x * 4);
                 const uint8_t r = src[srcIndex + 0];
                 const uint8_t g = src[srcIndex + 1];
                 const uint8_t b = src[srcIndex + 2];
@@ -383,7 +359,6 @@ juce::Image WebGPUGraphics::renderFrame()
 void WebGPUGraphics::shutdown()
 {
     initialized = false;
-    readbackTexture = {};
     renderTextureView = {};
     renderTexture = {};
     renderPipeline = {};
