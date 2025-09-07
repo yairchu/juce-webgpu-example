@@ -1,10 +1,10 @@
 #pragma once
 
-#include <webgpu/webgpu-raii.hpp>
-#include <juce_core/juce_core.h>
-#include <memory>
 #include <atomic>
 #include <functional>
+#include <juce_core/juce_core.h>
+#include <memory>
+#include <webgpu/webgpu-raii.hpp>
 
 class WebGPUCompute
 {
@@ -14,18 +14,18 @@ public:
 
     bool initialize();
     void shutdown();
-    
+
     // Run the compute shader asynchronously
-    void runComputeAsync(std::function<void(uint32_t)> callback);
-    
+    void runComputeAsync (std::function<void (uint32_t)> callback);
+
     // Run the compute shader synchronously
     uint32_t runComputeSync();
-    
+
     bool isInitialized() const { return initialized; }
 
-  private:
+private:
     bool initialized = false;
-    
+
     wgpu::raii::Instance instance;
     wgpu::raii::Device device;
     wgpu::raii::Queue queue;
@@ -36,6 +36,6 @@ public:
     wgpu::raii::PipelineLayout pipelineLayout;
     wgpu::raii::ComputePipeline pipeline;
     wgpu::raii::BindGroup bindGroup;
-    
-    static constexpr uint64_t bufferSize = sizeof(uint32_t);
+
+    static constexpr uint64_t bufferSize = sizeof (uint32_t);
 };
