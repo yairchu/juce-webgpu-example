@@ -13,11 +13,11 @@ public:
     bool moreThanOneInstanceAllowed() override             { return true; }
 
     //==============================================================================
-    void initialise(const juce::String& commandLine) override
-    {
-        // This method is where you should put your application's initialisation code..
-        
-        mainWindow.reset(new MainWindow(getApplicationName()));
+    void initialise(const juce::String &) override {
+      // This method is where you should put your application's initialisation
+      // code..
+
+      mainWindow.reset(new MainWindow(getApplicationName()));
     }
 
     void shutdown() override
@@ -35,11 +35,10 @@ public:
         quit();
     }
 
-    void anotherInstanceStarted(const juce::String& commandLine) override
-    {
-        // When another instance of the app is launched while this one is running,
-        // this method is invoked, and the commandLine parameter tells you what
-        // the other instance's command-line arguments were.
+    void anotherInstanceStarted(const juce::String &) override {
+      // When another instance of the app is launched while this one is running,
+      // this method is invoked, and the commandLine parameter tells you what
+      // the other instance's command-line arguments were.
     }
 
     //==============================================================================

@@ -191,14 +191,15 @@ uint32_t WebGPUCompute::runComputeSync()
         // Map and read result
         std::atomic<bool> mapped{false};
         staging->mapAsync(
-            WGPUMapMode_Read,
-            0,
-            bufferSize,
+            WGPUMapMode_Read, 0, bufferSize,
             WGPUBufferMapCallbackInfo{
-                .callback = [](WGPUMapAsyncStatus status, WGPUStringView message, void* userdata1, void* userdata2) {
-                    auto* flag = reinterpret_cast<std::atomic<bool>*>(userdata1);
-                    flag->store(true, std::memory_order_release);
-                },
+                .callback =
+                    [](WGPUMapAsyncStatus, WGPUStringView, void *userdata1,
+                       void *) {
+                      auto *flag =
+                          reinterpret_cast<std::atomic<bool> *>(userdata1);
+                      flag->store(true, std::memory_order_release);
+                    },
                 .userdata1 = &mapped,
             });
 
