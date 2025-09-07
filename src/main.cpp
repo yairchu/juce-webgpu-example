@@ -92,12 +92,22 @@ int main() {
     assert(shaderModule);
 
     const uint64_t bufferSize = sizeof(uint32_t);
-    WGPUBufferDescriptor bufDesc = {};
-    bufDesc.usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopySrc | WGPUBufferUsage_MapRead;
-    bufDesc.size  = bufferSize;
-    bufDesc.mappedAtCreation = false;
-    WGPUBuffer storage = wgpuDeviceCreateBuffer(device, &bufDesc);
+    
+    // Storage buffer for compute shader
+    WGPUBufferDescriptor storageDesc = {};
+    storageDesc.usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopySrc;
+    storageDesc.size = bufferSize;
+    storageDesc.mappedAtCreation = false;
+    WGPUBuffer storage = wgpuDeviceCreateBuffer(device, &storageDesc);
     assert(storage);
+    
+    // Staging buffer for reading results
+    WGPUBufferDescriptor stagingDesc = {};
+    stagingDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_MapRead;
+    stagingDesc.size = bufferSize;
+    stagingDesc.mappedAtCreation = false;
+    WGPUBuffer staging = wgpuDeviceCreateBuffer(device, &stagingDesc);
+    assert(staging);
 
     WGPUBindGroupLayoutEntry bglEntry = {};
     bglEntry.binding = 0;
@@ -147,6 +157,15 @@ int main() {
     WGPUCommandBuffer cmd = wgpuCommandEncoderFinish(encoder, &cbDesc);
     wgpuQueueSubmit(queue, 1, &cmd);
 
+    // Copy from storage buffer to staging buffer
+    {
+        WGPUCommandEncoder encoder = wgpuDeviceCreateCommandEncoder(device, nullptr);
+        wgpuCommandEncoderCopyBufferToBuffer(encoder, storage, 0, staging, 0, bufferSize);
+        WGPUCommandBufferDescriptor cbDesc = {};
+        WGPUCommandBuffer cmd = wgpuCommandEncoderFinish(encoder, &cbDesc);
+        wgpuQueueSubmit(queue, 1, &cmd);
+    }
+
     std::atomic<bool> mapped{false};
     auto onMap = [](WGPUMapAsyncStatus status, WGPUStringView message, void* userdata1, void* userdata2) {
         auto* flag = reinterpret_cast<std::atomic<bool>*>(userdata1);
@@ -156,14 +175,14 @@ int main() {
     mapCallback.callback = onMap;
     mapCallback.userdata1 = &mapped;
     mapCallback.userdata2 = nullptr;
-    wgpuBufferMapAsync(storage, WGPUMapMode_Read, 0, bufferSize, mapCallback);
+    wgpuBufferMapAsync(staging, WGPUMapMode_Read, 0, bufferSize, mapCallback);
     wait_until(mapped);
 
-    const void* ptr = wgpuBufferGetConstMappedRange(storage, 0, bufferSize);
+    const void* ptr = wgpuBufferGetConstMappedRange(staging, 0, bufferSize);
     uint32_t value = 0;
     std::memcpy(&value, ptr, sizeof(uint32_t));
     std::printf("Compute result: %u\n", value);
-    wgpuBufferUnmap(storage);
+    wgpuBufferUnmap(staging);
 
     return 0;
 }
