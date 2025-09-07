@@ -31,52 +31,13 @@ static void wait_until(std::atomic<bool>& flag, WGPUInstance instance = nullptr)
 }
 
 int main() {
-    WGPUInstanceDescriptor instanceDesc = {};
-    wgpu::Instance instance = wgpu::createInstance(instanceDesc);
+    wgpu::Instance instance = wgpu::createInstance({});
     assert(instance);
 
-    std::atomic<bool> gotAdapter{false};
-    wgpu::Adapter adapter = nullptr;
-    WGPURequestAdapterOptions adapterOpts = {};
-    adapterOpts.powerPreference = WGPUPowerPreference_HighPerformance;
-
-    auto onAdapter = [](WGPURequestAdapterStatus status, WGPUAdapter a, WGPUStringView message,
-                        void* userdata1, void* userdata2) {
-        auto* out = reinterpret_cast<std::pair<wgpu::Adapter*, std::atomic<bool>*>*>(userdata1);
-        if (status == WGPURequestAdapterStatus_Success) {
-            *out->first = wgpu::Adapter(a);
-        }
-        out->second->store(true, std::memory_order_release);
-    };
-    std::pair<wgpu::Adapter*, std::atomic<bool>*> adapterOut{&adapter, &gotAdapter};
-    WGPURequestAdapterCallbackInfo adapterCallback = {};
-    adapterCallback.callback = onAdapter;
-    adapterCallback.userdata1 = &adapterOut;
-    adapterCallback.userdata2 = nullptr;
-    wgpuInstanceRequestAdapter(instance, &adapterOpts, adapterCallback);
-    wait_until(gotAdapter);
+    wgpu::Adapter adapter = instance.requestAdapter({});
     assert(adapter);
 
-    std::atomic<bool> gotDevice{false};
-    wgpu::Device device = nullptr;
-    WGPUDeviceDescriptor deviceDesc = {};
-    deviceDesc.label = WGPUStringView{.data = "MyDevice", .length = 8};
-
-    auto onDevice = [](WGPURequestDeviceStatus status, WGPUDevice d, WGPUStringView message,
-                       void* userdata1, void* userdata2) {
-        auto* out = reinterpret_cast<std::pair<wgpu::Device*, std::atomic<bool>*>*>(userdata1);
-        if (status == WGPURequestDeviceStatus_Success) {
-            *out->first = wgpu::Device(d);
-        }
-        out->second->store(true, std::memory_order_release);
-    };
-    std::pair<wgpu::Device*, std::atomic<bool>*> deviceOut{&device, &gotDevice};
-    WGPURequestDeviceCallbackInfo deviceCallback = {};
-    deviceCallback.callback = onDevice;
-    deviceCallback.userdata1 = &deviceOut;
-    deviceCallback.userdata2 = nullptr;
-    wgpuAdapterRequestDevice(adapter, &deviceDesc, deviceCallback);
-    wait_until(gotDevice);
+    wgpu::Device device = adapter.requestDevice({});
     assert(device);
 
     // Note: wgpuDeviceSetUncapturedErrorCallback has been removed in newer WebGPU versions
