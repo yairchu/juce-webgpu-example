@@ -10,9 +10,6 @@
 class WebGPUGraphics
 {
 public:
-    WebGPUGraphics();
-    ~WebGPUGraphics();
-
     bool initialize (int width, int height);
     void shutdown();
     void resize (int width, int height);

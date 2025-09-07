@@ -4,9 +4,6 @@
 #include <cstring>
 #include <thread>
 
-WebGPUGraphics::WebGPUGraphics() = default;
-WebGPUGraphics::~WebGPUGraphics() = default;
-
 namespace
 {
 
@@ -230,13 +227,11 @@ void WebGPUGraphics::renderFrame()
         .clearValue = { 0.1f, 0.1f, 0.1f, 1.0f }, // Dark gray background
     };
 
-    WGPURenderPassDescriptor renderPassDesc = {
+    wgpu::raii::RenderPassEncoder pass = encoder->beginRenderPass (WGPURenderPassDescriptor {
         .colorAttachmentCount = 1,
         .colorAttachments = &colorAttachment,
         .depthStencilAttachment = nullptr,
-    };
-
-    wgpu::raii::RenderPassEncoder pass = encoder->beginRenderPass (renderPassDesc);
+    });
     pass->setPipeline (*renderPipeline);
     pass->setVertexBuffer (0, *vertexBuffer, 0, WGPU_WHOLE_SIZE);
     pass->draw (3, 1, 0, 0); // Draw 3 vertices
@@ -334,7 +329,7 @@ juce::Image WebGPUGraphics::renderFrameToImage()
         for (int x = 0; x < textureWidth; ++x)
         {
             // Use aligned bytes per row for source indexing
-            const int srcIndex = (y * (int) bytesPerRow) + (x * 4);
+            const int srcIndex = y * (int) bytesPerRow + x * 4;
             bitmap.setPixelColour (x, y, juce::Colour::fromRGBA (src[srcIndex + 0], src[srcIndex + 1], src[srcIndex + 2], src[srcIndex + 3]));
         }
 
