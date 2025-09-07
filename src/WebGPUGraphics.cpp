@@ -359,44 +359,17 @@ void WebGPUGraphics::shutdown()
     // Wait for any pending GPU operations to complete
     if (queue)
     {
-        try
         {
             // Submit an empty command buffer to flush the queue
             wgpu::raii::CommandEncoder encoder = device->createCommandEncoder();
             queue->submit (1, &*wgpu::raii::CommandBuffer (encoder->finish()));
-
-            // Process events to ensure completion
-            for (int i = 0; i < 100 && instance; ++i) // Max 100ms timeout
-            {
-                instance->processEvents();
-                std::this_thread::sleep_for (std::chrono::milliseconds (1));
-            }
         }
-        catch (...)
+
+        // Process events to ensure completion
+        for (int i = 0; i < 100 && instance; ++i) // Max 100ms timeout
         {
-            juce::Logger::writeToLog ("Exception during WebGPU queue flush");
+            instance->processEvents();
+            std::this_thread::sleep_for (std::chrono::milliseconds (1));
         }
     }
-
-    // Clean up resources in reverse order of creation
-    initialized.store (false);
-
-    try
-    {
-        renderTextureView = {};
-        renderTexture = {};
-        renderPipeline = {};
-        vertexBuffer = {};
-        fragmentShader = {};
-        vertexShader = {};
-        queue = {};
-        device = {};
-        instance = {};
-    }
-    catch (...)
-    {
-        juce::Logger::writeToLog ("Exception during WebGPU resource cleanup");
-    }
-
-    juce::Logger::writeToLog ("WebGPU shutdown completed");
 }
