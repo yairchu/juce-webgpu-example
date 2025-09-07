@@ -53,7 +53,7 @@ int main() {
     const uint64_t bufferSize = sizeof(uint32_t);
     
     // Storage buffer for compute shader
-    wgpu::Buffer storage = device->createBuffer (
+    wgpu::raii::Buffer storage = device->createBuffer (
         WGPUBufferDescriptor {
             .usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc,
             .size = bufferSize,
@@ -62,7 +62,7 @@ int main() {
     assert(storage);
     
     // Staging buffer for reading results
-    wgpu::Buffer staging = device->createBuffer (
+    wgpu::raii::Buffer staging = device->createBuffer (
         WGPUBufferDescriptor {
             .usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead,
             .size = bufferSize,
@@ -99,7 +99,7 @@ int main() {
 
     const WGPUBindGroupEntry bgEntry {
         .binding = 0,
-        .buffer = storage,
+        .buffer = *storage,
         .offset = 0,
         .size = bufferSize,
     };
@@ -122,13 +122,13 @@ int main() {
     // Copy from storage buffer to staging buffer
     {
         wgpu::CommandEncoder encoder = device->createCommandEncoder();
-        encoder.copyBufferToBuffer (storage, 0, staging, 0, bufferSize);
+        encoder.copyBufferToBuffer (*storage, 0, *staging, 0, bufferSize);
         wgpu::CommandBuffer cmd = encoder.finish();
         queue.submit (1, &cmd);
     }
 
     std::atomic<bool> mapped {false};
-    staging.mapAsync (
+    staging->mapAsync (
         WGPUMapMode_Read,
         0,
         bufferSize,
@@ -146,11 +146,11 @@ int main() {
         std::this_thread::sleep_for (std::chrono::milliseconds (1));
     }
 
-    const void* ptr = staging.getConstMappedRange (0, bufferSize);
+    const void* ptr = staging->getConstMappedRange (0, bufferSize);
     uint32_t value = 0;
     std::memcpy(&value, ptr, sizeof(uint32_t));
     std::printf("Compute result: %u\n", value);
-    staging.unmap();
+    staging->unmap();
 
     return 0;
 }
