@@ -4,15 +4,21 @@ project(MyWebGPUCompute C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-include(FetchContent)
-
-# Pull WebGPU-distribution (pin to a tag/commit you trust)
-FetchContent_Declare(
-  webgpu_dist
-  GIT_REPOSITORY https://github.com/eliemichel/WebGPU-distribution.git
-  GIT_TAG        17dcd42a7683355e7a40ac4e97e77f36dff5b5ab
+# Download CPM.cmake
+file(
+  DOWNLOAD
+  https://github.com/cpm-cmake/CPM.cmake/releases/download/v0.38.3/CPM.cmake
+  ${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake
+  EXPECTED_HASH SHA256=cc155ce02e7945e7b8967ddfaff0b050e958a723ef7aad3766d368940cb15494
 )
-FetchContent_MakeAvailable(webgpu_dist)
+include(${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake)
+
+# Pull WebGPU-distribution using CPM
+CPMAddPackage(
+  NAME webgpu_dist
+  GITHUB_REPOSITORY eliemichel/WebGPU-distribution
+  GIT_TAG 17dcd42a7683355e7a40ac4e97e77f36dff5b5ab
+)
 
 # Force backend to wgpu-native (WGPU)
 set(WEBGPU_BACKEND WGPU CACHE STRING "WebGPU backend")
