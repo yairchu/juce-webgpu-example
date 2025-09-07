@@ -28,12 +28,12 @@ int main() {
     wgpu::raii::Adapter adapter = instance->requestAdapter ({});
     assert(adapter);
 
-    wgpu::Device device = adapter->requestDevice ({});
+    wgpu::raii::Device device = adapter->requestDevice ({});
     assert(device);
 
     // Note: wgpuDeviceSetUncapturedErrorCallback has been removed in newer WebGPU versions
 
-    wgpu::Queue queue = device.getQueue();
+    wgpu::Queue queue = device->getQueue();
 
     std::string wgsl = load_text_file("shaders/comp.wgsl");
     assert(!wgsl.empty());
@@ -46,14 +46,14 @@ int main() {
         .nextInChain = &wgslSource.chain,
         .label = wgpu::StringView ("comp.wgsl"),
     };
-    // For a mysterious reason this fails when using device.createShaderModule(shaderDesc)
-    wgpu::ShaderModule shaderModule = wgpuDeviceCreateShaderModule (device, &shaderDesc);
+    // For a mysterious reason this fails when using device->createShaderModule(shaderDesc)
+    wgpu::ShaderModule shaderModule = wgpuDeviceCreateShaderModule (*device, &shaderDesc);
     assert(shaderModule);
 
     const uint64_t bufferSize = sizeof(uint32_t);
     
     // Storage buffer for compute shader
-    wgpu::Buffer storage = device.createBuffer (
+    wgpu::Buffer storage = device->createBuffer (
         WGPUBufferDescriptor {
             .usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc,
             .size = bufferSize,
@@ -62,7 +62,7 @@ int main() {
     assert(storage);
     
     // Staging buffer for reading results
-    wgpu::Buffer staging = device.createBuffer (
+    wgpu::Buffer staging = device->createBuffer (
         WGPUBufferDescriptor {
             .usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead,
             .size = bufferSize,
@@ -81,14 +81,14 @@ int main() {
             },
     };
     wgpu::BindGroupLayout bgl =
-        device.createBindGroupLayout (WGPUBindGroupLayoutDescriptor {.entryCount = 1, .entries = &bglEntry});
+        device->createBindGroupLayout (WGPUBindGroupLayoutDescriptor {.entryCount = 1, .entries = &bglEntry});
 
-    wgpu::PipelineLayout pipelineLayout = device.createPipelineLayout (
+    wgpu::PipelineLayout pipelineLayout = device->createPipelineLayout (
         WGPUPipelineLayoutDescriptor {
             .bindGroupLayoutCount = 1,
             .bindGroupLayouts = &(WGPUBindGroupLayout&) bgl,
         });
-    wgpu::ComputePipeline pipeline = device.createComputePipeline (
+    wgpu::ComputePipeline pipeline = device->createComputePipeline (
         WGPUComputePipelineDescriptor {
             .layout = pipelineLayout,
             .compute = {
@@ -103,14 +103,14 @@ int main() {
         .offset = 0,
         .size = bufferSize,
     };
-    wgpu::BindGroup bindGroup = device.createBindGroup (
+    wgpu::BindGroup bindGroup = device->createBindGroup (
         WGPUBindGroupDescriptor {
             .layout = bgl,
             .entryCount = 1,
             .entries = &bgEntry,
         });
 
-    wgpu::CommandEncoder encoder = device.createCommandEncoder();
+    wgpu::CommandEncoder encoder = device->createCommandEncoder();
     wgpu::ComputePassEncoder pass = encoder.beginComputePass();
     pass.setPipeline (pipeline);
     pass.setBindGroup (0, bindGroup, 0, nullptr);
@@ -121,7 +121,7 @@ int main() {
 
     // Copy from storage buffer to staging buffer
     {
-        wgpu::CommandEncoder encoder = device.createCommandEncoder();
+        wgpu::CommandEncoder encoder = device->createCommandEncoder();
         encoder.copyBufferToBuffer (storage, 0, staging, 0, bufferSize);
         wgpu::CommandBuffer cmd = encoder.finish();
         queue.submit (1, &cmd);
