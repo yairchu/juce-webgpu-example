@@ -61,19 +61,19 @@ int main() {
     const uint64_t bufferSize = sizeof(uint32_t);
     
     // Storage buffer for compute shader
-    WGPUBufferDescriptor storageDesc = {};
-    storageDesc.usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopySrc;
+    wgpu::BufferDescriptor storageDesc{};
+    storageDesc.usage = wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc;
     storageDesc.size = bufferSize;
     storageDesc.mappedAtCreation = false;
-    WGPUBuffer storage = wgpuDeviceCreateBuffer(device, &storageDesc);
+    wgpu::Buffer storage = device.createBuffer(storageDesc);
     assert(storage);
     
     // Staging buffer for reading results
-    WGPUBufferDescriptor stagingDesc = {};
-    stagingDesc.usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_MapRead;
+    wgpu::BufferDescriptor stagingDesc{};
+    stagingDesc.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead;
     stagingDesc.size = bufferSize;
     stagingDesc.mappedAtCreation = false;
-    WGPUBuffer staging = wgpuDeviceCreateBuffer(device, &stagingDesc);
+    wgpu::Buffer staging = device.createBuffer(stagingDesc);
     assert(staging);
 
     WGPUBindGroupLayoutEntry bglEntry = {};
