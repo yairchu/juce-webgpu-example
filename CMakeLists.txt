@@ -59,7 +59,8 @@ target_sources(JuceWebGPUExample
         src/MainComponent.cpp
         src/WebGPUGraphics.h
         src/WebGPUGraphics.cpp
-        src/WebGPUImpl.cpp
+        src/WebGPUUtils.h
+        src/WebGPUUtils.cpp
 )
 
 # Link JUCE modules

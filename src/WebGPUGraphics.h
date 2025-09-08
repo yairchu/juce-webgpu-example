@@ -7,6 +7,8 @@
 #include <mutex>
 #include <webgpu/webgpu-raii.hpp>
 
+#include "WebGPUUtils.h"
+
 class WebGPUGraphics
 {
 public:
@@ -17,7 +19,7 @@ public:
     void renderFrame();
 
     // Get the WebGPU texture for sharing with OpenGL
-    WGPUTexture getSharedTexture() const { return *renderTexture; }
+    WGPUTexture getSharedTexture() const { return *texture.texture; }
 
     // Legacy method for CPU readback (renamed from renderFrame to avoid confusion)
     juce::Image renderFrameToImage();
@@ -45,13 +47,10 @@ private:
     int textureHeight = 0;
     mutable std::mutex textureMutex; // Protects texture dimensions and resources
 
-    wgpu::raii::Instance instance;
-    wgpu::raii::Device device;
-    wgpu::raii::Queue queue;
+    WebGPUContext context;
     wgpu::raii::ShaderModule vertexShader;
     wgpu::raii::ShaderModule fragmentShader;
-    wgpu::raii::Texture renderTexture;
-    wgpu::raii::TextureView renderTextureView;
+    WebGPUTexture texture;
     wgpu::raii::Buffer vertexBuffer;
     wgpu::raii::RenderPipeline renderPipeline;
 

@@ -39,39 +39,11 @@ bool WebGPUGraphics::initialize (int width, int height)
     textureWidth = width;
     textureHeight = height;
 
-    instance = wgpu::createInstance();
-    if (! instance)
+    if (! context.init())
         return false;
 
-    auto adapter = wgpu::raii::Adapter (instance->requestAdapter ({}));
-    if (! adapter)
-        return false;
-
-    device = adapter->requestDevice ({});
-    if (! device)
-        return false;
-
-    queue = device->getQueue();
-
-    const WGPUShaderSourceWGSL vertexWgslSource {
-        .chain = { .sType = WGPUSType_ShaderSourceWGSL },
-        .code = wgpu::StringView (vertexShaderSource),
-    };
-    const WGPUShaderModuleDescriptor vertexShaderDesc {
-        .nextInChain = &vertexWgslSource.chain,
-        .label = wgpu::StringView ("vertex_shader"),
-    };
-    vertexShader = wgpu::raii::ShaderModule (wgpuDeviceCreateShaderModule (*device, &vertexShaderDesc));
-
-    const WGPUShaderSourceWGSL fragmentWgslSource {
-        .chain = { .sType = WGPUSType_ShaderSourceWGSL },
-        .code = wgpu::StringView (fragmentShaderSource),
-    };
-    const WGPUShaderModuleDescriptor fragmentShaderDesc {
-        .nextInChain = &fragmentWgslSource.chain,
-        .label = wgpu::StringView ("fragment_shader"),
-    };
-    fragmentShader = wgpu::raii::ShaderModule (wgpuDeviceCreateShaderModule (*device, &fragmentShaderDesc));
+    vertexShader = context.loadWgslShader (vertexShaderSource);
+    fragmentShader = context.loadWgslShader (fragmentShaderSource);
 
     if (! vertexShader || ! fragmentShader)
         return false;
@@ -86,20 +58,14 @@ bool WebGPUGraphics::initialize (int width, int height)
 
 bool WebGPUGraphics::createTexture (int width, int height)
 {
-    // Create render texture
-    renderTexture = device->createTexture (WGPUTextureDescriptor {
-        .usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::CopySrc,
-        .dimension = WGPUTextureDimension_2D,
-        .size = { static_cast<uint32_t> (width), static_cast<uint32_t> (height), 1 },
-        .format = WGPUTextureFormat_RGBA8Unorm,
-        .mipLevelCount = 1,
-        .sampleCount = 1,
-    });
-
-    renderTextureView = renderTexture->createView();
-
-    // No longer need readback texture - we copy directly from render texture to buffer
-    return renderTexture && renderTextureView;
+    return texture.init (context, {
+                                      .usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::CopySrc,
+                                      .dimension = WGPUTextureDimension_2D,
+                                      .size = { static_cast<uint32_t> (width), static_cast<uint32_t> (height), 1 },
+                                      .format = WGPUTextureFormat_RGBA8Unorm,
+                                      .mipLevelCount = 1,
+                                      .sampleCount = 1,
+                                  });
 }
 
 bool WebGPUGraphics::createVertexBuffer()
@@ -117,7 +83,7 @@ bool WebGPUGraphics::createVertexBuffer()
         { { 0.8f, -0.8f }, { 0.0f, 0.0f, 1.0f } }, // Bottom right - blue
     };
 
-    vertexBuffer = device->createBuffer (WGPUBufferDescriptor {
+    vertexBuffer = context.device->createBuffer (WGPUBufferDescriptor {
         .usage = wgpu::BufferUsage::Vertex,
         .size = sizeof (vertices),
         .mappedAtCreation = true,
@@ -166,7 +132,7 @@ bool WebGPUGraphics::createPipeline()
         .targets = &colorTarget,
     };
 
-    renderPipeline = device->createRenderPipeline (WGPURenderPipelineDescriptor {
+    renderPipeline = context.device->createRenderPipeline (WGPURenderPipelineDescriptor {
         .layout = nullptr, // Auto layout
         .vertex = {
             .module = *vertexShader,
@@ -207,9 +173,6 @@ void WebGPUGraphics::resize (int width, int height)
 
 void WebGPUGraphics::renderFrame()
 {
-    if (! initialized.load() || shutdownRequested.load())
-        return;
-
     std::lock_guard<std::mutex> lock (textureMutex);
 
     // Double-check after acquiring lock
@@ -217,10 +180,10 @@ void WebGPUGraphics::renderFrame()
         return;
 
     // GPU-only rendering - no CPU readback
-    wgpu::raii::CommandEncoder encoder = device->createCommandEncoder();
+    wgpu::raii::CommandEncoder encoder = context.device->createCommandEncoder();
 
     WGPURenderPassColorAttachment colorAttachment = {
-        .view = *renderTextureView,
+        .view = *texture.view,
         .resolveTarget = nullptr,
         .loadOp = WGPULoadOp_Clear,
         .storeOp = WGPUStoreOp_Store,
@@ -237,7 +200,7 @@ void WebGPUGraphics::renderFrame()
     pass->draw (3, 1, 0, 0); // Draw 3 vertices
     pass->end();
 
-    queue->submit (1, &*wgpu::raii::CommandBuffer (encoder->finish()));
+    context.queue->submit (1, &*wgpu::raii::CommandBuffer (encoder->finish()));
 }
 
 juce::Image WebGPUGraphics::renderFrameToImage()
@@ -256,67 +219,12 @@ juce::Image WebGPUGraphics::renderFrameToImage()
 
     // Read back the texture data directly from render texture
     // WebGPU requires bytes per row to be aligned to 256 bytes
-    const uint32_t unalignedBytesPerRow = (uint32_t) textureWidth * bytesPerPixel;
-    const uint32_t alignment = 256;
-    const uint32_t bytesPerRow = ((unalignedBytesPerRow + alignment - 1) / alignment) * alignment;
-    const uint32_t bufferSize = bytesPerRow * (uint32_t) textureHeight;
+    WebGPUTexture::MemLayout textureLayout { .width = (uint32_t) textureWidth, .height = (uint32_t) textureHeight, .bytesPerPixel = bytesPerPixel };
+    textureLayout.calcParams();
 
-    wgpu::raii::Buffer readbackBuffer = device->createBuffer (WGPUBufferDescriptor {
-        .usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead,
-        .size = bufferSize,
-        .mappedAtCreation = false,
-    });
+    wgpu::raii::Buffer readbackBuffer = texture.read (context, textureLayout);
 
-    // Copy render texture directly to buffer (no intermediate texture needed)
-    {
-        wgpu::raii::CommandEncoder encoder = device->createCommandEncoder();
-        encoder->copyTextureToBuffer (
-            WGPUTexelCopyTextureInfo {
-                .texture = *renderTexture, // Copy directly from render texture
-                .mipLevel = 0,
-                .origin = { 0, 0, 0 },
-                .aspect = WGPUTextureAspect_All,
-            },
-            WGPUTexelCopyBufferInfo {
-                .buffer = *readbackBuffer,
-                .layout = {
-                    .offset = 0,
-                    .bytesPerRow = bytesPerRow,
-                    .rowsPerImage = static_cast<uint32_t> (textureHeight),
-                },
-            },
-            WGPUExtent3D {
-                .width = static_cast<uint32_t> (textureWidth),
-                .height = static_cast<uint32_t> (textureHeight),
-                .depthOrArrayLayers = 1,
-            });
-        queue->submit (1, &*wgpu::raii::CommandBuffer (encoder->finish()));
-    }
-
-    // Map and read the buffer
-    std::atomic<bool> mapped { false };
-    readbackBuffer->mapAsync (
-        WGPUMapMode_Read, 0, bufferSize, WGPUBufferMapCallbackInfo {
-                                             .callback = [] (WGPUMapAsyncStatus, WGPUStringView, void* userdata1, void*)
-                                             {
-                                                 auto* flag = reinterpret_cast<std::atomic<bool>*> (userdata1);
-                                                 flag->store (true, std::memory_order_release);
-                                             },
-                                             .userdata1 = &mapped,
-                                         });
-
-    // Wait for mapping to complete, but check for shutdown
-    while (! mapped.load (std::memory_order_acquire) && ! shutdownRequested.load())
-    {
-        instance->processEvents();
-        std::this_thread::sleep_for (std::chrono::milliseconds (1));
-    }
-
-    // If shutdown was requested, abort the operation
-    if (shutdownRequested.load())
-        return {};
-
-    const void* ptr = readbackBuffer->getConstMappedRange (0, bufferSize);
+    const void* ptr = readbackBuffer->getConstMappedRange (0, textureLayout.bufferSize);
 
     // Create JUCE image from the data
     juce::Image image (juce::Image::ARGB, textureWidth, textureHeight, true);
@@ -329,7 +237,7 @@ juce::Image WebGPUGraphics::renderFrameToImage()
         for (int x = 0; x < textureWidth; ++x)
         {
             // Use aligned bytes per row for source indexing
-            const int srcIndex = y * (int) bytesPerRow + x * 4;
+            const int srcIndex = y * (int) textureLayout.bytesPerRow + x * 4;
             bitmap.setPixelColour (x, y, juce::Colour::fromRGBA (src[srcIndex + 0], src[srcIndex + 1], src[srcIndex + 2], src[srcIndex + 3]));
         }
 
@@ -351,20 +259,10 @@ void WebGPUGraphics::shutdown()
 
     juce::Logger::writeToLog ("WebGPU shutdown starting...");
 
-    // Wait for any pending GPU operations to complete
-    if (queue)
+    // Process events to ensure completion
+    for (int i = 0; i < 100; ++i) // Max 100ms timeout
     {
-        {
-            // Submit an empty command buffer to flush the queue
-            wgpu::raii::CommandEncoder encoder = device->createCommandEncoder();
-            queue->submit (1, &*wgpu::raii::CommandBuffer (encoder->finish()));
-        }
-
-        // Process events to ensure completion
-        for (int i = 0; i < 100 && instance; ++i) // Max 100ms timeout
-        {
-            instance->processEvents();
-            std::this_thread::sleep_for (std::chrono::milliseconds (1));
-        }
+        context.instance->processEvents();
+        std::this_thread::sleep_for (std::chrono::milliseconds (1));
     }
 }
