@@ -81,24 +81,22 @@ wgpu::raii::Buffer WebGPUTexture::read (WebGPUContext& context, const MemLayout&
         context.queue->submit (1, &*wgpu::raii::CommandBuffer (encoder->finish()));
     }
 
-    {
-        std::atomic<bool> mapped { false };
-        readbackBuffer->mapAsync (
-            WGPUMapMode_Read, 0, layout.bufferSize, WGPUBufferMapCallbackInfo {
-                                                        .callback = [] (WGPUMapAsyncStatus, WGPUStringView, void* userdata1, void*)
-                                                        {
-                                                            auto* flag = reinterpret_cast<std::atomic<bool>*> (userdata1);
-                                                            flag->store (true, std::memory_order_release);
-                                                        },
-                                                        .userdata1 = &mapped,
-                                                    });
+    std::atomic<bool> mapped { false };
+    readbackBuffer->mapAsync (
+        WGPUMapMode_Read, 0, layout.bufferSize, WGPUBufferMapCallbackInfo {
+                                                    .callback = [] (WGPUMapAsyncStatus, WGPUStringView, void* userdata1, void*)
+                                                    {
+                                                        auto* flag = reinterpret_cast<std::atomic<bool>*> (userdata1);
+                                                        flag->store (true, std::memory_order_release);
+                                                    },
+                                                    .userdata1 = &mapped,
+                                                });
 
-        // Wait for mapping to complete, but check for shutdown
-        while (! mapped.load (std::memory_order_acquire))
-        {
-            context.instance->processEvents();
-            std::this_thread::sleep_for (std::chrono::milliseconds (1));
-        }
+    // Wait for mapping to complete, but check for shutdown
+    while (! mapped.load (std::memory_order_acquire))
+    {
+        context.instance->processEvents();
+        std::this_thread::sleep_for (std::chrono::milliseconds (1));
     }
 
     return readbackBuffer;
