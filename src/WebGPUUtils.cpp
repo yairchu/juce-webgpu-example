@@ -20,15 +20,15 @@ bool WebGPUContext::init()
 
 wgpu::raii::ShaderModule WebGPUContext::loadWgslShader (const char* source, const char* name)
 {
-    const WGPUShaderSourceWGSL vertexWgslSource {
+    const WGPUShaderSourceWGSL wgslSource {
         .chain = { .sType = WGPUSType_ShaderSourceWGSL },
         .code = wgpu::StringView (source),
     };
-    const WGPUShaderModuleDescriptor vertexShaderDesc {
-        .nextInChain = &vertexWgslSource.chain,
-        .label = name == nullptr ? WGPUStringView {} : wgpu::StringView ("vertex_shader"),
+    const WGPUShaderModuleDescriptor shaderDesc {
+        .nextInChain = &wgslSource.chain,
+        .label = name == nullptr ? WGPUStringView {} : wgpu::StringView (name),
     };
-    return wgpu::raii::ShaderModule (wgpuDeviceCreateShaderModule (*device, &vertexShaderDesc));
+    return wgpu::raii::ShaderModule (wgpuDeviceCreateShaderModule (*device, &shaderDesc));
 }
 
 bool WebGPUTexture::init (WebGPUContext& context, const WGPUTextureDescriptor& desc)
