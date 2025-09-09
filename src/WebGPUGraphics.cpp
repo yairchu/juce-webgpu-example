@@ -63,9 +63,11 @@ void WebGPUGraphics::renderFrame()
     scene.render (context, texture);
 }
 
-static void readTextureToImage (WebGPUContext& context, WebGPUTexture& texture, juce::Image& image, int width, int height)
+// Read back texture data into a JUCE Image (assumes 4 bytes per pixel - RGBA)
+// Image and texture sizes must match!
+static void readTextureToImage (WebGPUContext& context, WebGPUTexture& texture, juce::Image& image)
 {
-    WebGPUTexture::MemLayout textureLayout { .width = (uint32_t) width, .height = (uint32_t) height, .bytesPerPixel = 4 };
+    WebGPUTexture::MemLayout textureLayout { .width = (uint32_t) image.getWidth(), .height = (uint32_t) image.getHeight(), .bytesPerPixel = 4 };
     textureLayout.calcParams();
 
     wgpu::raii::Buffer readbackBuffer = texture.read (context, textureLayout);
@@ -73,8 +75,8 @@ static void readTextureToImage (WebGPUContext& context, WebGPUTexture& texture, 
     // Copy pixel data (WebGPU uses RGBA, JUCE uses ARGB)
     const auto src = (uint8_t*) readbackBuffer->getConstMappedRange (0, textureLayout.bufferSize);
     juce::Image::BitmapData bitmap (image, juce::Image::BitmapData::writeOnly);
-    for (int y = 0; y < height; ++y)
-        for (int x = 0; x < width; ++x)
+    for (int y = 0; y < (int) textureLayout.width; ++y)
+        for (int x = 0; x < (int) textureLayout.height; ++x)
         {
             const int srcIndex = y * (int) textureLayout.bytesPerRow + x * 4;
             bitmap.setPixelColour (x, y, juce::Colour::fromRGBA (src[srcIndex + 0], src[srcIndex + 1], src[srcIndex + 2], src[srcIndex + 3]));
@@ -98,7 +100,7 @@ juce::Image WebGPUGraphics::renderFrameToImage()
         return {};
 
     juce::Image image (juce::Image::ARGB, textureWidth, textureHeight, true);
-    readTextureToImage (context, texture, image, textureWidth, textureHeight);
+    readTextureToImage (context, texture, image);
 
     return image;
 }
