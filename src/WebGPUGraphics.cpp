@@ -63,6 +63,26 @@ void WebGPUGraphics::renderFrame()
     scene.render (context, texture);
 }
 
+static void readTextureToImage (WebGPUContext& context, WebGPUTexture& texture, juce::Image& image, int width, int height)
+{
+    WebGPUTexture::MemLayout textureLayout { .width = (uint32_t) width, .height = (uint32_t) height, .bytesPerPixel = 4 };
+    textureLayout.calcParams();
+
+    wgpu::raii::Buffer readbackBuffer = texture.read (context, textureLayout);
+
+    // Copy pixel data (WebGPU uses RGBA, JUCE uses ARGB)
+    const auto src = (uint8_t*) readbackBuffer->getConstMappedRange (0, textureLayout.bufferSize);
+    juce::Image::BitmapData bitmap (image, juce::Image::BitmapData::writeOnly);
+    for (int y = 0; y < height; ++y)
+        for (int x = 0; x < width; ++x)
+        {
+            const int srcIndex = y * (int) textureLayout.bytesPerRow + x * 4;
+            bitmap.setPixelColour (x, y, juce::Colour::fromRGBA (src[srcIndex + 0], src[srcIndex + 1], src[srcIndex + 2], src[srcIndex + 3]));
+        }
+
+    readbackBuffer->unmap();
+}
+
 juce::Image WebGPUGraphics::renderFrameToImage()
 {
     if (! initialized.load() || shutdownRequested.load())
@@ -77,31 +97,8 @@ juce::Image WebGPUGraphics::renderFrameToImage()
     if (! initialized.load() || shutdownRequested.load())
         return {};
 
-    // Read back the texture data directly from render texture
-    // WebGPU requires bytes per row to be aligned to 256 bytes
-    WebGPUTexture::MemLayout textureLayout { .width = (uint32_t) textureWidth, .height = (uint32_t) textureHeight, .bytesPerPixel = bytesPerPixel };
-    textureLayout.calcParams();
-
-    wgpu::raii::Buffer readbackBuffer = texture.read (context, textureLayout);
-
-    const void* ptr = readbackBuffer->getConstMappedRange (0, textureLayout.bufferSize);
-
-    // Create JUCE image from the data
     juce::Image image (juce::Image::ARGB, textureWidth, textureHeight, true);
-    juce::Image::BitmapData bitmap (image, juce::Image::BitmapData::writeOnly);
-
-    // Copy pixel data (WebGPU uses RGBA, JUCE uses ARGB)
-    // Account for potential row padding due to alignment
-    const uint8_t* src = static_cast<const uint8_t*> (ptr);
-    for (int y = 0; y < textureHeight; ++y)
-        for (int x = 0; x < textureWidth; ++x)
-        {
-            // Use aligned bytes per row for source indexing
-            const int srcIndex = y * (int) textureLayout.bytesPerRow + x * 4;
-            bitmap.setPixelColour (x, y, juce::Colour::fromRGBA (src[srcIndex + 0], src[srcIndex + 1], src[srcIndex + 2], src[srcIndex + 3]));
-        }
-
-    readbackBuffer->unmap();
+    readTextureToImage (context, texture, image, textureWidth, textureHeight);
 
     return image;
 }
