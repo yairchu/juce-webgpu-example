@@ -3,12 +3,13 @@
 #include <webgpu/webgpu-raii.hpp>
 
 struct WebGPUContext;
+struct WebGPUTexture;
 
 class ExampleScene
 {
 public:
     bool initialize (WebGPUContext& context);
-    void render (WebGPUContext& context, wgpu::raii::TextureView& renderTarget);
+    void render (WebGPUContext& context, WebGPUTexture& renderTarget);
     void shutdown();
 
 private:

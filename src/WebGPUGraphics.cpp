@@ -60,7 +60,7 @@ void WebGPUGraphics::renderFrame()
     if (! initialized.load() || shutdownRequested.load())
         return;
 
-    scene.render (context, texture.view);
+    scene.render (context, texture);
 }
 
 juce::Image WebGPUGraphics::renderFrameToImage()

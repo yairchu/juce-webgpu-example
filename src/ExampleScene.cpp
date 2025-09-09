@@ -39,27 +39,27 @@ bool ExampleScene::initialize (WebGPUContext& context)
     return createVertexBuffer (context) && createPipeline (context);
 }
 
-void ExampleScene::render (WebGPUContext& context, wgpu::raii::TextureView& renderTarget)
+void ExampleScene::render (WebGPUContext& context, WebGPUTexture& texture)
 {
-    WGPURenderPassColorAttachment colorAttachment {
-        .view = *renderTarget,
-        .loadOp = WGPULoadOp_Clear,
-        .storeOp = WGPUStoreOp_Store,
-        .clearValue = { 0.2f, 0.2f, 0.2f, 1.0f }, // Dark gray background
-    };
-
-    WGPURenderPassDescriptor renderPassDesc {
-        .colorAttachmentCount = 1,
-        .colorAttachments = &colorAttachment,
-    };
-
     wgpu::raii::CommandEncoder encoder = context.device->createCommandEncoder();
-    wgpu::raii::RenderPassEncoder renderPass = encoder->beginRenderPass (renderPassDesc);
 
-    renderPass->setPipeline (*renderPipeline);
-    renderPass->setVertexBuffer (0, *vertexBuffer, 0, WGPU_WHOLE_SIZE);
-    renderPass->draw (3, 1, 0, 0); // Draw 3 vertices (triangle)
-    renderPass->end();
+    {
+        WGPURenderPassColorAttachment colorAttachment {
+            .view = *texture.view,
+            .loadOp = WGPULoadOp_Clear,
+            .storeOp = WGPUStoreOp_Store,
+            .clearValue = { 0.2f, 0.2f, 0.2f, 1.0f }, // Dark gray background
+        };
+        wgpu::raii::RenderPassEncoder renderPass = encoder->beginRenderPass (WGPURenderPassDescriptor {
+            .colorAttachmentCount = 1,
+            .colorAttachments = &colorAttachment,
+        });
+
+        renderPass->setPipeline (*renderPipeline);
+        renderPass->setVertexBuffer (0, *vertexBuffer, 0, WGPU_WHOLE_SIZE);
+        renderPass->draw (3, 1, 0, 0); // Draw 3 vertices (triangle)
+        renderPass->end();
+    }
 
     wgpu::raii::CommandBuffer commands = encoder->finish();
     context.queue->submit (1, &*commands);
@@ -85,8 +85,7 @@ bool ExampleScene::createVertexBuffer (WebGPUContext& context)
         .mappedAtCreation = true,
     });
 
-    void* mappedData = vertexBuffer->getMappedRange (0, sizeof (vertices));
-    std::memcpy (mappedData, vertices, sizeof (vertices));
+    std::memcpy (vertexBuffer->getMappedRange (0, sizeof (vertices)), vertices, sizeof (vertices));
     vertexBuffer->unmap();
 
     return vertexBuffer;
