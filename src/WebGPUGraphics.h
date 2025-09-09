@@ -7,6 +7,7 @@
 #include <mutex>
 #include <webgpu/webgpu-raii.hpp>
 
+#include "ExampleScene.h"
 #include "WebGPUUtils.h"
 
 class WebGPUGraphics
@@ -38,8 +39,6 @@ public:
 
 private:
     bool createTexture (int width, int height);
-    bool createPipeline();
-    bool createVertexBuffer();
 
     std::atomic<bool> initialized { false };
     std::atomic<bool> shutdownRequested { false };
@@ -48,11 +47,8 @@ private:
     mutable std::mutex textureMutex; // Protects texture dimensions and resources
 
     WebGPUContext context;
-    wgpu::raii::ShaderModule vertexShader;
-    wgpu::raii::ShaderModule fragmentShader;
+    ExampleScene scene;
     WebGPUTexture texture;
-    wgpu::raii::Buffer vertexBuffer;
-    wgpu::raii::RenderPipeline renderPipeline;
 
     static constexpr uint32_t bytesPerPixel = 4; // RGBA8
 };
