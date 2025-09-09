@@ -1,6 +1,6 @@
-#include "ExampleScene.h"
+#include "WebGPUExampleScene.h"
 
-#include "WebGPUGraphics.h"
+#include "WebGPUUtils.h"
 
 namespace
 {
@@ -29,7 +29,7 @@ const char* fragmentShaderSource = R"(
 
 } // namespace
 
-bool ExampleScene::initialize (WebGPUContext& context)
+bool WebGPUExampleScene::initialize (WebGPUContext& context)
 {
     vertexShader = context.loadWgslShader (vertexShaderSource);
     fragmentShader = context.loadWgslShader (fragmentShaderSource);
@@ -39,7 +39,7 @@ bool ExampleScene::initialize (WebGPUContext& context)
     return createVertexBuffer (context) && createPipeline (context);
 }
 
-void ExampleScene::render (WebGPUContext& context, WebGPUTexture& texture)
+void WebGPUExampleScene::render (WebGPUContext& context, WebGPUTexture& texture)
 {
     wgpu::raii::CommandEncoder encoder = context.device->createCommandEncoder();
 
@@ -65,7 +65,7 @@ void ExampleScene::render (WebGPUContext& context, WebGPUTexture& texture)
     context.queue->submit (1, &*commands);
 }
 
-bool ExampleScene::createVertexBuffer (WebGPUContext& context)
+bool WebGPUExampleScene::createVertexBuffer (WebGPUContext& context)
 {
     struct Vertex
     {
@@ -91,7 +91,7 @@ bool ExampleScene::createVertexBuffer (WebGPUContext& context)
     return vertexBuffer;
 }
 
-bool ExampleScene::createPipeline (WebGPUContext& context)
+bool WebGPUExampleScene::createPipeline (WebGPUContext& context)
 {
     WGPUVertexAttribute attributes[2] {
         {

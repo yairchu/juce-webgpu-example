@@ -7,7 +7,7 @@
 #include <mutex>
 #include <webgpu/webgpu-raii.hpp>
 
-#include "ExampleScene.h"
+#include "WebGPUExampleScene.h"
 #include "WebGPUUtils.h"
 
 class WebGPUGraphics
@@ -47,7 +47,7 @@ private:
     mutable std::mutex textureMutex; // Protects texture dimensions and resources
 
     WebGPUContext context;
-    ExampleScene scene;
+    WebGPUExampleScene scene;
     WebGPUTexture texture;
 
     static constexpr uint32_t bytesPerPixel = 4; // RGBA8

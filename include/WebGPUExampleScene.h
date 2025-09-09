@@ -5,7 +5,10 @@
 struct WebGPUContext;
 struct WebGPUTexture;
 
-class ExampleScene
+// An example scene that draws a colored triangle.
+// Can be used for validating that the webgpu setup works.
+
+class WebGPUExampleScene
 {
 public:
     bool initialize (WebGPUContext& context);
