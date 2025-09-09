@@ -7,10 +7,11 @@ but I intend to skip this step and keep rendering fully in GPU memory, probably 
 
 ## Building the Example
 
+Set up with CMake and build/run using your preferred backend, for example for using Xcode:
+
 ```bash
-mkdir build && cd build
-cmake ..
-cmake --build .
+cmake -B build -G Xcode
+open build/JuceWebGPU.xcodeproj
 ```
 
 ## Usage as Library Dependency
