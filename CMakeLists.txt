@@ -4,12 +4,30 @@ project(JuceWebGPU VERSION 1.0.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Only build example if this is the main project (not a dependency)
-option(JUCE_WEBGPU_BUILD_EXAMPLE "Build the example application" ${PROJECT_IS_TOP_LEVEL})
+add_library(juce-webgpu
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/WebGPUUtils.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/WebGPUExampleScene.cpp"
+)
+target_include_directories(juce-webgpu
+    PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
 
-# When used as dependency, require that these targets already exist
-# When building standalone, fetch them ourselves
-if(PROJECT_IS_TOP_LEVEL AND JUCE_WEBGPU_BUILD_EXAMPLE)
+target_link_libraries(juce-webgpu
+    PUBLIC
+        webgpu
+)
+
+# Modules that depend on JUCE cannot be compiled as part of the library.
+# Instead we export a list of source files that can be added to the user's target.
+set(JUCE_WEBGPU_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/WebGPUJuceUtils.cpp"
+    CACHE INTERNAL "JUCE WebGPU source files for embedding in dependent projects"
+)
+
+if(PROJECT_IS_TOP_LEVEL)
+    target_sources(juce-webgpu PRIVATE $JUCE_WEBGPU_SOURCES)
+
     # Download CPM.cmake
     file(
       DOWNLOAD
@@ -35,32 +53,15 @@ if(PROJECT_IS_TOP_LEVEL AND JUCE_WEBGPU_BUILD_EXAMPLE)
 
     # Force backend to wgpu-native (WGPU)
     set(WEBGPU_BACKEND WGPU CACHE STRING "WebGPU backend")
-endif()
 
-# Create the library target
-add_library(juce-webgpu
-    src/WebGPUUtils.cpp
-    src/WebGPUJuceUtils.cpp
-    src/WebGPUExampleScene.cpp
-)
+    # Declare what we need - let the parent project provide it
+    target_link_libraries(juce-webgpu
+        PUBLIC
+            juce::juce_gui_basics
+            juce::juce_core
+            juce::juce_graphics
+    )
 
-target_include_directories(juce-webgpu
-    PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:include>
-)
-
-# Declare what we need - let the parent project provide it
-target_link_libraries(juce-webgpu
-    PUBLIC
-        juce::juce_gui_basics
-        juce::juce_core
-        juce::juce_graphics
-        webgpu
-)
-
-# Build example only if requested and we're the main project
-if(PROJECT_IS_TOP_LEVEL AND JUCE_WEBGPU_BUILD_EXAMPLE)
     # Example application (only built when this is the main project)
     juce_add_gui_app(JuceWebGPUExample
         PRODUCT_NAME "JUCE WebGPU Example"

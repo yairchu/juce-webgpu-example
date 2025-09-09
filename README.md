@@ -45,8 +45,9 @@ CPMAddPackage(
     GIT_TAG main
 )
 
-# Use in your target
+# Use in your target, with some sources embedded to avoid JUCE-CMake interaction problems
 target_link_libraries(your_target PRIVATE juce-webgpu)
+target_sources(your_target PRIVATE ${JUCE_WEBGPU_SOURCES})
 ```
 
 The example application will only be built when this project is the main project being built, not when used as a dependency.
