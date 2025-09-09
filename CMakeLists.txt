@@ -57,6 +57,8 @@ target_sources(JuceWebGPUExample
         src/main.cpp
         src/MainComponent.h
         src/MainComponent.cpp
+        src/WebGPUJuceUtils.h
+        src/WebGPUJuceUtils.cpp
         src/WebGPUGraphics.h
         src/WebGPUGraphics.cpp
         src/WebGPUUtils.h
