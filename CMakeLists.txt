@@ -26,7 +26,7 @@ set(JUCE_WEBGPU_SOURCES
 )
 
 if(PROJECT_IS_TOP_LEVEL)
-    target_sources(juce-webgpu PRIVATE $JUCE_WEBGPU_SOURCES)
+    target_sources(juce-webgpu PRIVATE ${JUCE_WEBGPU_SOURCES})
 
     # Download CPM.cmake
     file(
