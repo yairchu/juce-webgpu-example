@@ -66,12 +66,12 @@ wgpu::raii::Buffer WebGPUTexture::read (WebGPUContext& context, const MemLayout&
                 .aspect = WGPUTextureAspect_All,
             },
             WGPUTexelCopyBufferInfo {
-                .buffer = *readbackBuffer,
                 .layout = {
                     .offset = 0,
                     .bytesPerRow = layout.bytesPerRow,
                     .rowsPerImage = layout.height,
                 },
+                .buffer = *readbackBuffer,
             },
             WGPUExtent3D {
                 .width = layout.width,

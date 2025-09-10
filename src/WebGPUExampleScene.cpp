@@ -107,8 +107,8 @@ bool WebGPUExampleScene::createPipeline (WebGPUContext& context)
     };
 
     WGPUVertexBufferLayout vertexBufferLayout {
-        .arrayStride = 5 * sizeof (float), // 2 floats for position + 3 floats for color
         .stepMode = WGPUVertexStepMode_Vertex,
+        .arrayStride = 5 * sizeof (float), // 2 floats for position + 3 floats for color
         .attributeCount = 2,
         .attributes = attributes,
     };
@@ -140,12 +140,12 @@ bool WebGPUExampleScene::createPipeline (WebGPUContext& context)
             .frontFace = WGPUFrontFace_CCW,
             .cullMode = WGPUCullMode_None,
         },
-        .fragment = &fragmentState,
         .multisample = {
             .count = 1,
             .mask = UINT32_MAX,
             .alphaToCoverageEnabled = false,
         },
+        .fragment = &fragmentState,
     });
 
     return renderPipeline;
