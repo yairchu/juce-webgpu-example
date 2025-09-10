@@ -18,6 +18,8 @@ target_link_libraries(juce-webgpu
         webgpu
 )
 
+set(WEBGPU_LINK_TYPE STATIC CACHE INTERNAL "WebGPU library linking can be SHARED or STATIC")
+
 # Modules that depend on JUCE cannot be compiled as part of the library.
 # Instead we export a list of source files that can be added to the user's target.
 set(JUCE_WEBGPU_SOURCES
@@ -49,6 +51,7 @@ if(PROJECT_IS_TOP_LEVEL)
       NAME webgpu_dist
       GITHUB_REPOSITORY eliemichel/WebGPU-distribution
       GIT_TAG 17dcd42a7683355e7a40ac4e97e77f36dff5b5ab
+      OPTIONS "WEBGPU_LINK_TYPE ${WEBGPU_LINK_TYPE}"
     )
 
     # Force backend to wgpu-native (WGPU)
