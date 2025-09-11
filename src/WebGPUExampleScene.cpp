@@ -1,6 +1,7 @@
 #include "WebGPUExampleScene.h"
 
 #include "WebGPUUtils.h"
+#include <cstring>
 
 namespace
 {
