@@ -49,8 +49,8 @@ if(PROJECT_IS_TOP_LEVEL)
     # Pull WebGPU-distribution using CPM
     CPMAddPackage(
       NAME webgpu_dist
-      GITHUB_REPOSITORY eliemichel/WebGPU-distribution
-      GIT_TAG 17dcd42a7683355e7a40ac4e97e77f36dff5b5ab
+      GITHUB_REPOSITORY talaviram/WebGPU-distribution
+      GIT_TAG d20157b3b0fa87c3978e8e201414ea331c7fe0ea
       OPTIONS "WEBGPU_LINK_TYPE ${WEBGPU_LINK_TYPE}"
     )
 
