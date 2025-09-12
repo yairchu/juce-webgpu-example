@@ -115,7 +115,7 @@ bool WebGPUExampleScene::createPipeline (WebGPUContext& context)
     };
 
     WGPUColorTargetState colorTarget {
-        .format = WGPUTextureFormat_RGBA8Unorm,
+        .format = WGPUTextureFormat_BGRA8Unorm,
         .blend = nullptr,
         .writeMask = WGPUColorWriteMask_All,
     };

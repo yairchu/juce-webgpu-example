@@ -33,7 +33,7 @@ bool WebGPUGraphics::createTexture (int width, int height)
                                       .usage = wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::CopySrc,
                                       .dimension = WGPUTextureDimension_2D,
                                       .size = { static_cast<uint32_t> (width), static_cast<uint32_t> (height), 1 },
-                                      .format = WGPUTextureFormat_RGBA8Unorm,
+                                      .format = WGPUTextureFormat_BGRA8Unorm,
                                       .mipLevelCount = 1,
                                       .sampleCount = 1,
                                   });
