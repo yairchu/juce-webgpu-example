@@ -45,6 +45,9 @@ if(PROJECT_IS_TOP_LEVEL)
       GITHUB_REPOSITORY juce-framework/JUCE
       GIT_TAG 8.0.3
     )
+    
+    # Add JUCE module path
+    list(APPEND CMAKE_MODULE_PATH "${JUCE_SOURCE_DIR}/extras/Build/CMake")
 
     # Pull WebGPU-distribution using CPM
     CPMAddPackage(
@@ -100,8 +103,8 @@ if(PROJECT_IS_TOP_LEVEL)
     target_link_libraries(JuceWebGPUExample
         PRIVATE
             juce-webgpu
-            juce::juce_gui_extra
             juce::juce_events
+            curl  # Add libcurl for HTTP support
         PUBLIC
             juce::juce_recommended_config_flags
             juce::juce_recommended_lto_flags
