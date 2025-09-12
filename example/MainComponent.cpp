@@ -10,19 +10,26 @@ MainComponent::MainComponent()
     statusLabel.setJustificationType (juce::Justification::centred);
     addAndMakeVisible (statusLabel);
 
-    // Try to create OpenGL component
-    try
+    // Try to create OpenGL component (can be disabled by setting useOpenGLRendering to false)
+    if (useOpenGLRendering)
     {
-        openglComponent = std::make_unique<OpenGLWebGPUComponent>();
-        openglComponent->setWebGPUGraphics (webgpuGraphics);
-        addAndMakeVisible (*openglComponent);
-        
-        juce::Logger::writeToLog ("Using OpenGL-based WebGPU rendering (GPU-only path)");
+        try
+        {
+            openglComponent = std::make_unique<OpenGLWebGPUComponent>();
+            openglComponent->setWebGPUGraphics (webgpuGraphics);
+            addAndMakeVisible (*openglComponent);
+            
+            juce::Logger::writeToLog ("Using OpenGL-based WebGPU rendering (GPU-only path)");
+        }
+        catch (...)
+        {
+            useOpenGLRendering = false;
+            juce::Logger::writeToLog ("OpenGL not available, falling back to CPU-based rendering");
+        }
     }
-    catch (...)
+    else
     {
-        useOpenGLRendering = false;
-        juce::Logger::writeToLog ("OpenGL not available, falling back to CPU-based rendering");
+        juce::Logger::writeToLog ("Using CPU-based WebGPU rendering (legacy path)");
     }
 
     setSize (800, 600);
