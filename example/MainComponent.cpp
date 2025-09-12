@@ -18,7 +18,7 @@ MainComponent::MainComponent()
             openglComponent = std::make_unique<OpenGLWebGPUComponent>();
             openglComponent->setWebGPUGraphics (webgpuGraphics);
             addAndMakeVisible (*openglComponent);
-            
+
             juce::Logger::writeToLog ("Using OpenGL-based WebGPU rendering (GPU-only path)");
         }
         catch (...)
@@ -40,10 +40,8 @@ MainComponent::MainComponent()
         bool success = webgpuGraphics->initialize(getWidth(), getHeight());
         juce::MessageManager::callAsync([this, success]() {
             if (success) {
-                statusLabel.setText(useOpenGLRendering ? 
-                    "WebGPU + OpenGL initialized successfully!" : 
-                    "WebGPU initialized successfully (CPU fallback)!", 
-                    juce::dontSendNotification);
+                statusLabel.setText (useOpenGLRendering ? "WebGPU + OpenGL initialized successfully!" : "WebGPU initialized successfully (CPU fallback)!",
+                                     juce::dontSendNotification);
                 isInitialized = true;
                 // Start timer for continuous rendering
                 startTimer(16); // ~60 FPS
@@ -84,8 +82,8 @@ void MainComponent::paint (juce::Graphics& g)
         // Traditional CPU-based rendering
         g.drawImage (renderedImage, getLocalBounds().removeFromBottom (getHeight() - 30).toFloat());
     }
-    
-    if (!isInitialized)
+
+    if (! isInitialized)
     {
         g.setColour (juce::Colours::white);
         g.setFont (20.0f);
@@ -96,16 +94,16 @@ void MainComponent::paint (juce::Graphics& g)
 void MainComponent::resized()
 {
     auto area = getLocalBounds();
-    
+
     // Reserve space for status label at the top
     statusLabel.setBounds (area.removeFromTop (30));
-    
+
     // Update OpenGL component or WebGPU graphics size
     if (useOpenGLRendering && openglComponent)
     {
         openglComponent->setBounds (area);
     }
-    
+
     if (webgpuGraphics)
     {
         webgpuGraphics->resize (area.getWidth(), area.getHeight());
@@ -117,7 +115,7 @@ void MainComponent::timerCallback()
     // Check both flags to prevent rendering during shutdown
     if (isInitialized && webgpuGraphics && webgpuGraphics->isInitialized())
     {
-        if (!useOpenGLRendering || !openglComponent)
+        if (! useOpenGLRendering || ! openglComponent)
         {
             // Use traditional CPU-based rendering for fallback
             renderGraphics();

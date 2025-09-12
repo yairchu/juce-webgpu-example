@@ -1,7 +1,7 @@
 #pragma once
 
-#include <juce_opengl/juce_opengl.h>
 #include "WebGPUGraphics.h"
+#include <juce_opengl/juce_opengl.h>
 
 /**
  * OpenGL-based component that displays WebGPU content without CPU memory roundtrip.
@@ -29,22 +29,22 @@ public:
 private:
     // Transfer WebGPU texture data to OpenGL texture
     void updateOpenGLTexture();
-    
+
     // Render the OpenGL texture as a quad
     void renderTextureQuad();
 
     std::shared_ptr<WebGPUGraphics> webgpuGraphics;
     std::unique_ptr<juce::OpenGLTexture> openglTexture;
     std::unique_ptr<juce::OpenGLShaderProgram> shaderProgram;
-    
+
     // Simple quad vertices for texture rendering
     GLuint vertexBuffer = 0;
     GLuint indexBuffer = 0;
-    
+
     // Shader attribute locations
     GLint positionAttribLocation = -1;
     GLint texCoordAttribLocation = -1;
-    
+
     bool isInitialized = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OpenGLWebGPUComponent)

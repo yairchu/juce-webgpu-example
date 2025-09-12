@@ -1,7 +1,7 @@
 #pragma once
 
-#include "WebGPUGraphics.h"
 #include "OpenGLWebGPUComponent.h"
+#include "WebGPUGraphics.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
 class MainComponent : public juce::Component, private juce::Timer
@@ -20,15 +20,15 @@ private:
     std::shared_ptr<WebGPUGraphics> webgpuGraphics;
 
     juce::Label statusLabel;
-    
+
     // Traditional CPU-based rendering
     juce::Image renderedImage;
-    
+
     // New OpenGL-based rendering (when available)
     std::unique_ptr<OpenGLWebGPUComponent> openglComponent;
-    
+
     // Flag to control which rendering method to use
-    bool useOpenGLRendering = true;  // Try OpenGL first, fallback to CPU if needed
+    bool useOpenGLRendering = true; // Try OpenGL first, fallback to CPU if needed
 
     bool isInitialized = false;
 
