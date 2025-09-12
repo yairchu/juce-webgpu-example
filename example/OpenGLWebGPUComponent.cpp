@@ -3,28 +3,29 @@
 
 namespace
 {
-    // Simple vertex shader for rendering a textured quad
-    const char* vertexShader = 
-        "#version 330 core\n"
-        "layout (location = 0) in vec2 position;\n"
-        "layout (location = 1) in vec2 texCoord;\n"
-        "out vec2 fragmentTexCoord;\n"
-        "void main()\n"
-        "{\n"
-        "    gl_Position = vec4(position, 0.0, 1.0);\n"
-        "    fragmentTexCoord = texCoord;\n"
-        "}\n";
+    // Simple vertex shader for rendering a textured quad (OpenGL 2.1 compatible)
+    const char* vertexShader = R"(
+        attribute vec2 position;
+        attribute vec2 texCoord;
+        varying vec2 fragmentTexCoord;
+        
+        void main()
+        {
+            gl_Position = vec4(position, 0.0, 1.0);
+            fragmentTexCoord = texCoord;
+        }
+    )";
 
-    // Simple fragment shader for rendering a texture
-    const char* fragmentShader = 
-        "#version 330 core\n"
-        "in vec2 fragmentTexCoord;\n"
-        "out vec4 fragColor;\n"
-        "uniform sampler2D textureSampler;\n"
-        "void main()\n"
-        "{\n"
-        "    fragColor = texture(textureSampler, fragmentTexCoord);\n"
-        "}\n";
+    // Simple fragment shader for rendering a texture (OpenGL 2.1 compatible)
+    const char* fragmentShader = R"(
+        varying vec2 fragmentTexCoord;
+        uniform sampler2D textureSampler;
+        
+        void main()
+        {
+            gl_FragColor = texture2D(textureSampler, fragmentTexCoord);
+        }
+    )";
 
     // Quad vertices: position (x, y) and texture coordinates (u, v)
     const float quadVertices[] = {
@@ -66,6 +67,16 @@ void OpenGLWebGPUComponent::initialise()
         shaderProgram->link())
     {
         juce::Logger::writeToLog ("OpenGL shaders compiled successfully");
+        
+        // Get attribute locations
+        positionAttribLocation = openGLContext.extensions.glGetAttribLocation (shaderProgram->getProgramID(), "position");
+        texCoordAttribLocation = openGLContext.extensions.glGetAttribLocation (shaderProgram->getProgramID(), "texCoord");
+        
+        if (positionAttribLocation < 0 || texCoordAttribLocation < 0)
+        {
+            juce::Logger::writeToLog ("Failed to get shader attribute locations");
+            return;
+        }
     }
     else
     {
@@ -177,22 +188,30 @@ void OpenGLWebGPUComponent::renderTextureQuad()
     openGLContext.extensions.glBindBuffer (juce::gl::GL_ARRAY_BUFFER, vertexBuffer);
     
     // Position attribute
-    openGLContext.extensions.glVertexAttribPointer (0, 2, juce::gl::GL_FLOAT, juce::gl::GL_FALSE, 
-                                                   4 * sizeof (float), (void*) 0);
-    openGLContext.extensions.glEnableVertexAttribArray (0);
+    if (positionAttribLocation >= 0)
+    {
+        openGLContext.extensions.glVertexAttribPointer (positionAttribLocation, 2, juce::gl::GL_FLOAT, juce::gl::GL_FALSE, 
+                                                       4 * sizeof (float), (void*) 0);
+        openGLContext.extensions.glEnableVertexAttribArray (positionAttribLocation);
+    }
     
     // Texture coordinate attribute
-    openGLContext.extensions.glVertexAttribPointer (1, 2, juce::gl::GL_FLOAT, juce::gl::GL_FALSE, 
-                                                   4 * sizeof (float), (void*) (2 * sizeof (float)));
-    openGLContext.extensions.glEnableVertexAttribArray (1);
+    if (texCoordAttribLocation >= 0)
+    {
+        openGLContext.extensions.glVertexAttribPointer (texCoordAttribLocation, 2, juce::gl::GL_FLOAT, juce::gl::GL_FALSE, 
+                                                       4 * sizeof (float), (void*) (2 * sizeof (float)));
+        openGLContext.extensions.glEnableVertexAttribArray (texCoordAttribLocation);
+    }
 
     // Render the quad
     openGLContext.extensions.glBindBuffer (juce::gl::GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
     juce::gl::glDrawElements (juce::gl::GL_TRIANGLES, 6, juce::gl::GL_UNSIGNED_INT, nullptr);
 
     // Cleanup
-    openGLContext.extensions.glDisableVertexAttribArray (0);
-    openGLContext.extensions.glDisableVertexAttribArray (1);
+    if (positionAttribLocation >= 0)
+        openGLContext.extensions.glDisableVertexAttribArray (positionAttribLocation);
+    if (texCoordAttribLocation >= 0)
+        openGLContext.extensions.glDisableVertexAttribArray (texCoordAttribLocation);
     openglTexture->unbind();
 }
 

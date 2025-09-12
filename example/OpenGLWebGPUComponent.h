@@ -41,6 +41,10 @@ private:
     GLuint vertexBuffer = 0;
     GLuint indexBuffer = 0;
     
+    // Shader attribute locations
+    GLint positionAttribLocation = -1;
+    GLint texCoordAttribLocation = -1;
+    
     bool isInitialized = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OpenGLWebGPUComponent)
