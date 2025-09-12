@@ -41,7 +41,7 @@ set(WEBGPU_BACKEND WGPU CACHE STRING "WebGPU backend")  # Choose wgpu or dawn ba
 # Then add this library
 CPMAddPackage(
     NAME juce-webgpu
-    GITHUB_REPOSITORY yairchu/juce-webgpu-example
+    GITHUB_REPOSITORY yairchu/juce-webgpu
     GIT_TAG main
 )
 
