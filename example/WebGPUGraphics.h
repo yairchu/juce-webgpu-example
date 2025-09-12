@@ -37,6 +37,10 @@ public:
         return textureHeight;
     }
 
+    // Get access to WebGPU resources for OpenGL integration
+    WebGPUContext& getContext() { return context; }
+    WebGPUTexture& getTexture() { return texture; }
+
 private:
     bool createTexture (int width, int height);
 
