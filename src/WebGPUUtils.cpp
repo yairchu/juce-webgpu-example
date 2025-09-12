@@ -4,6 +4,32 @@
 
 #include <thread>
 
+namespace
+{
+uint32_t getBytesPerPixel (WGPUTextureFormat format)
+{
+    switch (format)
+    {
+        case WGPUTextureFormat_RGBA8Unorm:
+        case WGPUTextureFormat_RGBA8UnormSrgb:
+        case WGPUTextureFormat_BGRA8Unorm:
+        case WGPUTextureFormat_BGRA8UnormSrgb:
+            return 4;
+        case WGPUTextureFormat_RG8Unorm:
+            return 2;
+        case WGPUTextureFormat_R8Unorm:
+            return 1;
+        case WGPUTextureFormat_RGBA16Float:
+            return 8;
+        case WGPUTextureFormat_RGBA32Float:
+            return 16;
+        default:
+            // Default to 4 bytes for common RGBA formats
+            return 4;
+    }
+}
+} // namespace
+
 bool WebGPUContext::init()
 {
     instance = wgpu::createInstance();
@@ -33,6 +59,7 @@ wgpu::raii::ShaderModule WebGPUContext::loadWgslShader (const char* source, cons
 
 bool WebGPUTexture::init (WebGPUContext& context, const WGPUTextureDescriptor& desc)
 {
+    descriptor = desc;
     texture = context.device->createTexture (desc);
     if (! texture)
         return false;
@@ -40,19 +67,14 @@ bool WebGPUTexture::init (WebGPUContext& context, const WGPUTextureDescriptor& d
     return view;
 }
 
-void WebGPUTexture::MemLayout::calcParams()
+wgpu::raii::Buffer WebGPUTexture::read (WebGPUContext& context)
 {
-    const uint32_t unalignedBytesPerRow = width * bytesPerPixel;
-    const uint32_t alignment = 256;
-    bytesPerRow = ((unalignedBytesPerRow + alignment - 1) / alignment) * alignment;
-    bufferSize = bytesPerRow * height;
-}
+    const auto rowSize = (uint32_t) bytesPerRow();
+    const uint32_t bufferSize = rowSize * descriptor.size.height;
 
-wgpu::raii::Buffer WebGPUTexture::read (WebGPUContext& context, const MemLayout& layout)
-{
     wgpu::raii::Buffer readbackBuffer = context.device->createBuffer (WGPUBufferDescriptor {
         .usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead,
-        .size = layout.bufferSize,
+        .size = bufferSize,
         .mappedAtCreation = false,
     });
 
@@ -68,14 +90,14 @@ wgpu::raii::Buffer WebGPUTexture::read (WebGPUContext& context, const MemLayout&
             WGPUTexelCopyBufferInfo {
                 .layout = {
                     .offset = 0,
-                    .bytesPerRow = layout.bytesPerRow,
-                    .rowsPerImage = layout.height,
+                    .bytesPerRow = rowSize,
+                    .rowsPerImage = descriptor.size.height,
                 },
                 .buffer = *readbackBuffer,
             },
             WGPUExtent3D {
-                .width = layout.width,
-                .height = layout.height,
+                .width = descriptor.size.width,
+                .height = descriptor.size.height,
                 .depthOrArrayLayers = 1,
             });
         context.queue->submit (1, &*wgpu::raii::CommandBuffer (encoder->finish()));
@@ -83,14 +105,14 @@ wgpu::raii::Buffer WebGPUTexture::read (WebGPUContext& context, const MemLayout&
 
     std::atomic<bool> mapped { false };
     readbackBuffer->mapAsync (
-        WGPUMapMode_Read, 0, layout.bufferSize, WGPUBufferMapCallbackInfo {
-                                                    .callback = [] (WGPUMapAsyncStatus, WGPUStringView, void* userdata1, void*)
-                                                    {
-                                                        auto* flag = reinterpret_cast<std::atomic<bool>*> (userdata1);
-                                                        flag->store (true, std::memory_order_release);
-                                                    },
-                                                    .userdata1 = &mapped,
-                                                });
+        WGPUMapMode_Read, 0, bufferSize, WGPUBufferMapCallbackInfo {
+                                             .callback = [] (WGPUMapAsyncStatus, WGPUStringView, void* userdata1, void*)
+                                             {
+                                                 auto* flag = reinterpret_cast<std::atomic<bool>*> (userdata1);
+                                                 flag->store (true, std::memory_order_release);
+                                             },
+                                             .userdata1 = &mapped,
+                                         });
 
     // Wait for mapping to complete, but check for shutdown
     while (! mapped.load (std::memory_order_acquire))
@@ -100,4 +122,11 @@ wgpu::raii::Buffer WebGPUTexture::read (WebGPUContext& context, const MemLayout&
     }
 
     return readbackBuffer;
+}
+
+int WebGPUTexture::bytesPerRow() const
+{
+    const uint32_t unalignedBytesPerRow = descriptor.size.width * getBytesPerPixel (descriptor.format);
+    const uint32_t alignment = 256;
+    return ((unalignedBytesPerRow + alignment - 1) / alignment) * alignment;
 }

@@ -16,17 +16,13 @@ struct WebGPUContext
 
 struct WebGPUTexture
 {
-    struct MemLayout
-    {
-        uint32_t width, height, bytesPerPixel; // inputs
-        uint32_t bytesPerRow, bufferSize; // calculated
-
-        void calcParams();
-    };
-
     wgpu::raii::Texture texture;
     wgpu::raii::TextureView view;
 
+    // The descriptor contains texture size and format
+    WGPUTextureDescriptor descriptor;
+
     bool init (WebGPUContext&, const WGPUTextureDescriptor&);
-    wgpu::raii::Buffer read (WebGPUContext&, const MemLayout&);
+    wgpu::raii::Buffer read (WebGPUContext&);
+    int bytesPerRow() const;
 };
