@@ -110,6 +110,15 @@ if(PROJECT_IS_TOP_LEVEL)
             juce::juce_recommended_warning_flags
     )
     
+    # macOS-specific frameworks for Metal-OpenGL interop
+    if(APPLE)
+        target_link_libraries(JuceWebGPUExample PRIVATE
+            "-framework Metal"
+            "-framework IOSurface"
+            "-framework OpenGL"
+        )
+    endif()
+    
     # Disable web browser and curl to avoid extra dependencies
     target_compile_definitions(JuceWebGPUExample PRIVATE 
         JUCE_WEB_BROWSER=0

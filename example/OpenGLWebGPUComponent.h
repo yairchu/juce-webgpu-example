@@ -3,6 +3,14 @@
 #include "WebGPUGraphics.h"
 #include <juce_opengl/juce_opengl.h>
 
+// Platform-specific headers for direct GPU-to-GPU copy
+#ifdef __APPLE__
+    #include <Metal/Metal.h>
+    #include <IOSurface/IOSurface.h>
+    #include <OpenGL/CGLIOSurface.h>
+    #include <webgpu/webgpu.h>
+#endif
+
 /**
  * OpenGL-based component that displays WebGPU content without CPU memory roundtrip.
  * 
@@ -29,6 +37,17 @@ public:
 private:
     // Transfer WebGPU texture data to OpenGL texture
     void updateOpenGLTexture();
+    
+#ifdef __APPLE__
+    // Direct GPU-to-GPU copy on macOS using Metal-OpenGL interop
+    bool updateOpenGLTextureDirect();
+    
+    // Get Metal texture from WebGPU texture (platform-specific)
+    id<MTLTexture> getMetalTextureFromWebGPU(WGPUTexture webgpuTexture);
+#endif
+    
+    // Fallback CPU path (current implementation)
+    void updateOpenGLTextureCPU();
 
     // Render the OpenGL texture as a quad
     void renderTextureQuad();
@@ -44,6 +63,13 @@ private:
     // Shader attribute locations
     GLint positionAttribLocation = -1;
     GLint texCoordAttribLocation = -1;
+
+#ifdef __APPLE__
+    // macOS-specific resources for direct GPU copy
+    IOSurfaceRef ioSurface = nullptr;
+    GLuint ioSurfaceTextureId = 0;
+    bool directCopySupported = false;
+#endif
 
     bool isInitialized = false;
 
