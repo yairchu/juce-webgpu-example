@@ -45,9 +45,6 @@ if(PROJECT_IS_TOP_LEVEL)
       GITHUB_REPOSITORY juce-framework/JUCE
       GIT_TAG 8.0.3
     )
-    
-    # Add JUCE module path
-    list(APPEND CMAKE_MODULE_PATH "${JUCE_SOURCE_DIR}/extras/Build/CMake")
 
     # Pull WebGPU-distribution using CPM
     CPMAddPackage(
@@ -59,9 +56,6 @@ if(PROJECT_IS_TOP_LEVEL)
 
     # Force backend to wgpu-native (WGPU)
     set(WEBGPU_BACKEND WGPU CACHE STRING "WebGPU backend")
-    
-    # Disable JUCE web browser to avoid GTK dependency
-    set(JUCE_WEB_BROWSER 0)
 
     # Declare what we need - let the parent project provide it
     target_link_libraries(juce-webgpu
@@ -110,14 +104,13 @@ if(PROJECT_IS_TOP_LEVEL)
             juce-webgpu
             juce::juce_events
             juce::juce_opengl
-            curl  # Add libcurl for HTTP support
         PUBLIC
             juce::juce_recommended_config_flags
             juce::juce_recommended_lto_flags
             juce::juce_recommended_warning_flags
     )
     
-    # Disable web browser to avoid GTK dependencies
+    # Disable web browser and curl to avoid extra dependencies
     target_compile_definitions(JuceWebGPUExample PRIVATE 
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
