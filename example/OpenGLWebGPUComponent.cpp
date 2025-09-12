@@ -49,7 +49,7 @@ OpenGLWebGPUComponent::OpenGLWebGPUComponent()
 
 OpenGLWebGPUComponent::~OpenGLWebGPUComponent()
 {
-    // OpenGLAppComponent destructor will handle OpenGL cleanup
+    openGLContext.detach();
 }
 
 void OpenGLWebGPUComponent::setWebGPUGraphics (std::shared_ptr<WebGPUGraphics> graphics)
@@ -190,17 +190,17 @@ void OpenGLWebGPUComponent::renderTextureQuad()
     // Position attribute
     if (positionAttribLocation >= 0)
     {
-        openGLContext.extensions.glVertexAttribPointer (positionAttribLocation, 2, juce::gl::GL_FLOAT, juce::gl::GL_FALSE, 
-                                                       4 * sizeof (float), (void*) 0);
-        openGLContext.extensions.glEnableVertexAttribArray (positionAttribLocation);
+        openGLContext.extensions.glVertexAttribPointer ((GLuint) positionAttribLocation, 2, juce::gl::GL_FLOAT, juce::gl::GL_FALSE,
+                                                        4 * sizeof (float), (void*) nullptr);
+        openGLContext.extensions.glEnableVertexAttribArray ((GLuint) positionAttribLocation);
     }
     
     // Texture coordinate attribute
     if (texCoordAttribLocation >= 0)
     {
-        openGLContext.extensions.glVertexAttribPointer (texCoordAttribLocation, 2, juce::gl::GL_FLOAT, juce::gl::GL_FALSE, 
+        openGLContext.extensions.glVertexAttribPointer ((GLuint) texCoordAttribLocation, 2, juce::gl::GL_FLOAT, juce::gl::GL_FALSE,
                                                        4 * sizeof (float), (void*) (2 * sizeof (float)));
-        openGLContext.extensions.glEnableVertexAttribArray (texCoordAttribLocation);
+        openGLContext.extensions.glEnableVertexAttribArray ((GLuint) texCoordAttribLocation);
     }
 
     // Render the quad
@@ -209,9 +209,9 @@ void OpenGLWebGPUComponent::renderTextureQuad()
 
     // Cleanup
     if (positionAttribLocation >= 0)
-        openGLContext.extensions.glDisableVertexAttribArray (positionAttribLocation);
+        openGLContext.extensions.glDisableVertexAttribArray ((GLuint) positionAttribLocation);
     if (texCoordAttribLocation >= 0)
-        openGLContext.extensions.glDisableVertexAttribArray (texCoordAttribLocation);
+        openGLContext.extensions.glDisableVertexAttribArray ((GLuint) texCoordAttribLocation);
     openglTexture->unbind();
 }
 
@@ -224,9 +224,6 @@ void OpenGLWebGPUComponent::paint (juce::Graphics&)
 
 void OpenGLWebGPUComponent::resized()
 {
-    // Update OpenGL viewport
     if (isInitialized)
-    {
         juce::gl::glViewport (0, 0, getWidth(), getHeight());
-    }
 }
