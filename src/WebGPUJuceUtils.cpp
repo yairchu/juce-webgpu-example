@@ -15,6 +15,9 @@ void WebGPUJuceUtils::readTextureToImage (WebGPUContext& context, WebGPUTexture&
     const auto src = (uint8_t*) readbackBuffer->getConstMappedRange (0, bytesPerRow * texture.descriptor.size.height);
     juce::Image::BitmapData bitmap (image, juce::Image::BitmapData::writeOnly);
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wswitch-enum"
+
     switch (texture.descriptor.format)
     {
         case WGPUTextureFormat_BGRA8Unorm:
@@ -35,6 +38,8 @@ void WebGPUJuceUtils::readTextureToImage (WebGPUContext& context, WebGPUTexture&
             jassertfalse; // Unsupported format
             break;
     }
+
+#pragma GCC diagnostic pop
 
     readbackBuffer->unmap();
 }
