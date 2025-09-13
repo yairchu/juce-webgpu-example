@@ -130,3 +130,12 @@ int WebGPUTexture::bytesPerRow() const
     const uint32_t alignment = 256;
     return ((unalignedBytesPerRow + alignment - 1) / alignment) * alignment;
 }
+
+const char* WebGPUPassThroughFragmentShader::wgslSource = R"(
+    @fragment
+    fn fragIdent(@location(0) color: vec3<f32>) -> @location(0) vec4<f32> {
+        return vec4<f32>(color, 1.0);
+    }
+)";
+
+const char* WebGPUPassThroughFragmentShader::entryPoint = "fragIdent";

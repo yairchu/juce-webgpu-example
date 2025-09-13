@@ -21,19 +21,12 @@ const char* vertexShaderSource = R"(
     }
 )";
 
-const char* fragmentShaderSource = R"(
-    @fragment
-    fn fs_main(@location(0) color: vec3<f32>) -> @location(0) vec4<f32> {
-        return vec4<f32>(color, 1.0);
-    }
-)";
-
 } // namespace
 
 bool WebGPUExampleScene::initialize (WebGPUContext& context)
 {
     vertexShader = context.loadWgslShader (vertexShaderSource);
-    fragmentShader = context.loadWgslShader (fragmentShaderSource);
+    fragmentShader = context.loadWgslShader (WebGPUPassThroughFragmentShader::wgslSource);
     if (! fragmentShader || ! vertexShader)
         return false;
 
@@ -122,7 +115,7 @@ bool WebGPUExampleScene::createPipeline (WebGPUContext& context)
 
     WGPUFragmentState fragmentState {
         .module = *fragmentShader,
-        .entryPoint = wgpu::StringView ("fs_main"),
+        .entryPoint = wgpu::StringView (WebGPUPassThroughFragmentShader::entryPoint),
         .targetCount = 1,
         .targets = &colorTarget,
     };

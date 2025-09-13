@@ -26,3 +26,9 @@ struct WebGPUTexture
     wgpu::raii::Buffer read (WebGPUContext&);
     int bytesPerRow() const;
 };
+
+struct WebGPUPassThroughFragmentShader
+{
+    static const char* wgslSource;
+    static const char* entryPoint;
+};
