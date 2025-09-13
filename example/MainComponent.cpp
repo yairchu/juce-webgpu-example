@@ -3,12 +3,34 @@
 MainComponent::MainComponent()
 {
     // Initialize WebGPU graphics
-    webgpuGraphics = std::make_unique<WebGPUGraphics>();
+    webgpuGraphics = std::make_shared<WebGPUGraphics>();
 
     // Setup UI components
     statusLabel.setText ("Initializing WebGPU...", juce::dontSendNotification);
     statusLabel.setJustificationType (juce::Justification::centred);
     addAndMakeVisible (statusLabel);
+
+    // Try to create OpenGL component (can be disabled by setting useOpenGLRendering to false)
+    if (useOpenGLRendering)
+    {
+        try
+        {
+            openglComponent = std::make_unique<OpenGLWebGPUComponent>();
+            openglComponent->setWebGPUGraphics (webgpuGraphics);
+            addAndMakeVisible (*openglComponent);
+
+            juce::Logger::writeToLog ("Using OpenGL-based WebGPU rendering (GPU-only path)");
+        }
+        catch (...)
+        {
+            useOpenGLRendering = false;
+            juce::Logger::writeToLog ("OpenGL not available, falling back to CPU-based rendering");
+        }
+    }
+    else
+    {
+        juce::Logger::writeToLog ("Using CPU-based WebGPU rendering (legacy path)");
+    }
 
     setSize (800, 600);
 
@@ -18,7 +40,8 @@ MainComponent::MainComponent()
         bool success = webgpuGraphics->initialize(getWidth(), getHeight());
         juce::MessageManager::callAsync([this, success]() {
             if (success) {
-                statusLabel.setText("WebGPU initialized successfully!", juce::dontSendNotification);
+                statusLabel.setText (useOpenGLRendering ? "WebGPU + OpenGL initialized successfully!" : "WebGPU initialized successfully (CPU fallback)!",
+                                     juce::dontSendNotification);
                 isInitialized = true;
                 // Start timer for continuous rendering
                 startTimer(16); // ~60 FPS
@@ -49,12 +72,18 @@ void MainComponent::paint (juce::Graphics& g)
 {
     g.fillAll (getLookAndFeel().findColour (juce::ResizableWindow::backgroundColourId));
 
-    if (isInitialized && ! renderedImage.isNull())
+    if (useOpenGLRendering && openglComponent)
     {
-        // Draw the WebGPU rendered image
-        g.drawImage (renderedImage, getLocalBounds().toFloat());
+        // OpenGL component handles its own rendering
+        // Just draw status label if needed
     }
-    else
+    else if (isInitialized && ! renderedImage.isNull())
+    {
+        // Traditional CPU-based rendering
+        g.drawImage (renderedImage, getLocalBounds().removeFromBottom (getHeight() - 30).toFloat());
+    }
+
+    if (! isInitialized)
     {
         g.setColour (juce::Colours::white);
         g.setFont (20.0f);
@@ -64,16 +93,20 @@ void MainComponent::paint (juce::Graphics& g)
 
 void MainComponent::resized()
 {
-    auto bounds = getLocalBounds();
+    auto area = getLocalBounds();
 
-    // Position status label at top
-    auto statusArea = bounds.removeFromTop (30);
-    statusLabel.setBounds (statusArea);
+    // Reserve space for status label at the top
+    statusLabel.setBounds (area.removeFromTop (30));
 
-    // Resize WebGPU graphics if initialized
-    if (isInitialized && webgpuGraphics)
+    // Update OpenGL component or WebGPU graphics size
+    if (useOpenGLRendering && openglComponent)
     {
-        webgpuGraphics->resize (getWidth(), getHeight() - 30); // Account for status label
+        openglComponent->setBounds (area);
+    }
+
+    if (webgpuGraphics)
+    {
+        webgpuGraphics->resize (area.getWidth(), area.getHeight());
     }
 }
 
@@ -82,7 +115,12 @@ void MainComponent::timerCallback()
     // Check both flags to prevent rendering during shutdown
     if (isInitialized && webgpuGraphics && webgpuGraphics->isInitialized())
     {
-        renderGraphics();
+        if (! useOpenGLRendering || ! openglComponent)
+        {
+            // Use traditional CPU-based rendering for fallback
+            renderGraphics();
+        }
+        // OpenGL component handles its own rendering in its render() method
     }
 }
 

@@ -94,18 +94,35 @@ if(PROJECT_IS_TOP_LEVEL)
             example/MainComponent.cpp
             example/WebGPUGraphics.h
             example/WebGPUGraphics.cpp
+            example/OpenGLWebGPUComponent.h
+            example/OpenGLWebGPUComponent.cpp
     )
 
     # Link JUCE modules and our library
     target_link_libraries(JuceWebGPUExample
         PRIVATE
             juce-webgpu
-            juce::juce_gui_extra
             juce::juce_events
+            juce::juce_opengl
         PUBLIC
             juce::juce_recommended_config_flags
             juce::juce_recommended_lto_flags
             juce::juce_recommended_warning_flags
+    )
+    
+    # macOS-specific frameworks for Metal-OpenGL interop
+    if(APPLE)
+        target_link_libraries(JuceWebGPUExample PRIVATE
+            "-framework Metal"
+            "-framework IOSurface"
+            "-framework OpenGL"
+        )
+    endif()
+    
+    # Disable web browser and curl to avoid extra dependencies
+    target_compile_definitions(JuceWebGPUExample PRIVATE 
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
     )
 
     # Compiler-specific options
