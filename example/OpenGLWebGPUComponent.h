@@ -42,8 +42,11 @@ private:
     // Direct GPU-to-GPU copy on macOS using Metal-OpenGL interop
     bool updateOpenGLTextureDirect();
     
-    // Get Metal texture from WebGPU texture (platform-specific)
-    id<MTLTexture> getMetalTextureFromWebGPU(WGPUTexture webgpuTexture);
+    // Create IOSurface-backed Metal texture for sharing
+    bool createSharedIOSurfaceTexture(int width, int height);
+    
+    // Update WebGPU to render into our shared IOSurface texture
+    bool configureWebGPUForSharedTexture();
 #endif
     
     // Fallback CPU path (current implementation)
@@ -68,7 +71,13 @@ private:
     // macOS-specific resources for direct GPU copy
     IOSurfaceRef ioSurface = nullptr;
     GLuint ioSurfaceTextureId = 0;
+    id<MTLTexture> sharedMetalTexture = nil;
+    id<MTLDevice> metalDevice = nil;
     bool directCopySupported = false;
+    
+    // Shared texture dimensions for IOSurface
+    int sharedTextureWidth = 0;
+    int sharedTextureHeight = 0;
 #endif
 
     bool isInitialized = false;
